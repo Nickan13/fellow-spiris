@@ -98,6 +98,55 @@ db.serialize(() => {
     CREATE INDEX IF NOT EXISTS idx_ghl_writeback_logs_location_opportunity
     ON ghl_writeback_logs(location_id, opportunity_id)
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS fellow_product_mappings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      fellow_product_id TEXT NOT NULL,
+      spiris_article_number TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(location_id, fellow_product_id)
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_fellow_product_mappings_location_product
+    ON fellow_product_mappings(location_id, fellow_product_id)
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_fellow_product_mappings_location_article
+    ON fellow_product_mappings(location_id, spiris_article_number)
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS spiris_invoice_mappings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      fellow_invoice_id TEXT NOT NULL,
+      spiris_invoice_id TEXT NOT NULL,
+      spiris_customer_id TEXT,
+      source_event_type TEXT,
+      request_json TEXT NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(location_id, fellow_invoice_id),
+      UNIQUE(location_id, spiris_invoice_id)
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_spiris_invoice_mappings_location_invoice
+    ON spiris_invoice_mappings(location_id, fellow_invoice_id)
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_spiris_invoice_mappings_location_spiris_invoice
+    ON spiris_invoice_mappings(location_id, spiris_invoice_id)
+  `);
 });
 
 module.exports = db;

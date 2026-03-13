@@ -1,18 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const invoiceOrchestrator = require("../services/invoiceOrchestrator");
 const tokenService = require("../services/tokenService");
 const articleSyncService = require("../services/articleSyncService");
-const draftMappingStore = require("../services/draftMappingStore");
-const ghlService = require("../services/ghlService");
-const ghlWritebackStore = require("../services/ghlWritebackStore");
-const env = require("../config/env");
+const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
 
 router.get("/spiris/company-settings", async (req, res) => {
   try {
     return res.status(501).json({
       ok: false,
-      message: "Use the draft test route instead."
+      message: "Not implemented"
     });
   } catch (err) {
     return res.status(500).json({
@@ -47,6 +43,81 @@ router.post("/spiris/articles/sync", async (req, res) => {
       ok: false,
       error: err.message,
       response: err.response?.data || null
+    });
+  }
+});
+
+router.post("/mappings/products", async (req, res) => {
+  try {
+    const {
+      locationId,
+      fellowProductId,
+      spirisArticleNumber
+    } = req.body;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    if (!fellowProductId) {
+      return res.status(400).json({
+        ok: false,
+        error: "fellowProductId is required"
+      });
+    }
+
+    if (!spirisArticleNumber) {
+      return res.status(400).json({
+        ok: false,
+        error: "spirisArticleNumber is required"
+      });
+    }
+
+    await fellowProductMappingRepo.upsertMapping({
+      locationId,
+      fellowProductId,
+      spirisArticleNumber
+    });
+
+    return res.json({
+      ok: true,
+      locationId,
+      fellowProductId,
+      spirisArticleNumber
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+  }
+});
+
+router.get("/mappings/products", async (req, res) => {
+  try {
+    const locationId = req.query.locationId;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId query param is required"
+      });
+    }
+
+    const rows = await fellowProductMappingRepo.listMappingsByLocation(locationId);
+
+    return res.json({
+      ok: true,
+      count: rows.length,
+      rows
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      error: err.message
     });
   }
 });
