@@ -2,6 +2,7 @@ const AppError = require("../utils/AppError");
 const express = require("express");
 const router = express.Router();
 const platformWebhookLogRepo = require("../db/repositories/platformWebhookLogRepo");
+const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -29,8 +30,10 @@ router.post("/platform", async (req, res) => {
       null;
 
     const invoiceId =
+      body._id ||
       body.id ||
       body.invoiceId ||
+      body.data?._id ||
       body.data?.id ||
       body.data?.invoiceId ||
       null;
@@ -48,25 +51,77 @@ router.post("/platform", async (req, res) => {
       }
     });
 
-    console.log("[platform-webhook] received", {
-      eventType,
+    if (eventType !== "InvoiceSent") {
+      return res.status(200).json({
+        ok: true,
+        received: true,
+        ignored: true,
+        reason: "Only InvoiceSent is processed",
+        eventType,
+        locationId,
+        invoiceId
+      });
+    }
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId missing in platform webhook"
+      });
+    }
+
+    if (!invoiceId) {
+      return res.status(400).json({
+        ok: false,
+        error: "invoiceId missing in platform webhook"
+      });
+    }
+
+    const existingMapping = await spirisInvoiceMappingRepo.getByLocationAndFellowInvoiceId(
       locationId,
       invoiceId
+    );
+
+    if (existingMapping) {
+      return res.status(200).json({
+        ok: true,
+        received: true,
+        reused: true,
+        eventType,
+        locationId,
+        fellowInvoiceId: invoiceId,
+        spirisInvoiceId: existingMapping.spirisInvoiceId
+      });
+    }
+
+    const result = await invoiceOrchestrator.createInvoiceFromPlatformPayload(body);
+
+    await spirisInvoiceMappingRepo.createMapping({
+      locationId,
+      fellowInvoiceId: invoiceId,
+      spirisInvoiceId: result.invoice.Id,
+      spirisCustomerId: result.customer.Id,
+      sourceEventType: eventType,
+      request: result.payload,
+      response: result.invoice
     });
 
     return res.status(200).json({
       ok: true,
       received: true,
+      reused: false,
       eventType,
       locationId,
-      invoiceId
+      fellowInvoiceId: invoiceId,
+      spirisInvoiceId: result.invoice.Id
     });
   } catch (err) {
-    console.error("[platform-webhook] error:", err.message);
+    console.error("[platform-webhook] error:", err.response?.data || err.message);
 
     return res.status(500).json({
       ok: false,
-      error: "platform webhook failed"
+      error: err.message,
+      response: err.response?.data || null
     });
   }
 });
@@ -121,7 +176,7 @@ router.post("/invoice/create-draft", async (req, res) => {
       result = created;
     }
 
-        try {
+    try {
       const existingSuccessfulWriteback = await ghlWritebackStore.getSuccessfulWriteback({
         locationId: input.locationId,
         opportunityId: input.opportunityId,
@@ -176,7 +231,6 @@ router.post("/invoice/create-draft", async (req, res) => {
         }
       });
     } catch (writebackErr) {
-    
       await ghlWritebackStore.createWritebackLog({
         locationId: input.locationId,
         opportunityId: input.opportunityId,
@@ -208,30 +262,29 @@ router.post("/invoice/create-draft", async (req, res) => {
       });
     }
   } catch (err) {
+    if (err instanceof AppError) {
+      return res.status(err.statusCode).json({
+        ok: false,
+        error: err.message,
+        code: err.code
+      });
+    }
 
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
+    if (err.response?.data) {
+      return res.status(502).json({
+        ok: false,
+        error: "External API error",
+        providerResponse: err.response.data
+      });
+    }
+
+    console.error("Unhandled error:", err);
+
+    return res.status(500).json({
       ok: false,
-      error: err.message,
-      code: err.code
+      error: "Internal server error"
     });
   }
-
-  if (err.response?.data) {
-    return res.status(502).json({
-      ok: false,
-      error: "External API error",
-      providerResponse: err.response.data
-    });
-  }
-
-  console.error("Unhandled error:", err);
-
-  return res.status(500).json({
-    ok: false,
-    error: "Internal server error"
-  });
-}
 });
 
 module.exports = router;

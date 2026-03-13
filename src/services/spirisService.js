@@ -105,6 +105,18 @@ async function createInvoiceDraft(accessToken, payload) {
   return response.data;
 }
 
+async function createInvoice(accessToken, payload) {
+  const response = await axios.post(
+    `${env.spirisApiBase}/v2/customerinvoices`,
+    payload,
+    {
+      headers: getAuthHeaders(accessToken)
+    }
+  );
+
+  return response.data;
+}
+
 module.exports = {
   getCompanySettings,
   getArticlesPage,
@@ -112,5 +124,6 @@ module.exports = {
   findCustomerByOrgNumber,
   findCustomerByEmail,
   createCustomer,
-  createInvoiceDraft
+  createInvoiceDraft,
+  createInvoice
 };
