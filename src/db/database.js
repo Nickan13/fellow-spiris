@@ -1,0 +1,103 @@
+const sqlite3 = require("sqlite3").verbose();
+const env = require("../config/env");
+const path = require("path");
+const fs = require("fs");
+
+const dbPath = path.resolve(env.sqlitePath);
+
+// säkerställ att mappen finns
+const dir = path.dirname(dbPath);
+if (!fs.existsSync(dir)) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error("SQLite connection error:", err.message);
+  } else {
+    console.log("Connected to SQLite database:", dbPath);
+  }
+});
+
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS spiris_articles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      spiris_article_id TEXT NOT NULL,
+      article_number TEXT NOT NULL,
+      name TEXT,
+      unit_price REAL,
+      raw_json TEXT NOT NULL,
+      changed_utc TEXT,
+      last_synced_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(location_id, article_number),
+      UNIQUE(location_id, spiris_article_id)
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_spiris_articles_location_number
+    ON spiris_articles(location_id, article_number)
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_spiris_articles_location_spiris_id
+    ON spiris_articles(location_id, spiris_article_id)
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS spiris_draft_mappings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      estimate_id TEXT NOT NULL,
+      spiris_draft_id TEXT NOT NULL,
+      spiris_customer_id TEXT,
+      request_json TEXT NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(location_id, estimate_id),
+      UNIQUE(location_id, spiris_draft_id)
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_spiris_draft_mappings_location_estimate
+    ON spiris_draft_mappings(location_id, estimate_id)
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_spiris_draft_mappings_location_draft
+    ON spiris_draft_mappings(location_id, spiris_draft_id)
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ghl_writeback_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      opportunity_id TEXT NOT NULL,
+      estimate_id TEXT NOT NULL,
+      spiris_draft_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      request_json TEXT NOT NULL,
+      response_json TEXT,
+      error_text TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_ghl_writeback_logs_location_estimate
+    ON ghl_writeback_logs(location_id, estimate_id)
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_ghl_writeback_logs_location_opportunity
+    ON ghl_writeback_logs(location_id, opportunity_id)
+  `);
+});
+
+module.exports = db;

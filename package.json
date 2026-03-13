@@ -1,0 +1,31 @@
+{
+  "name": "fellow-spiris",
+  "version": "1.0.0",
+  "description": "För integration mellan Fellow och Spiris (eEkonomi)",
+  "main": "index.js", 
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nickan13/fellow-spiris.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Nickan13/fellow-spiris/issues"
+  },
+  "homepage": "https://github.com/Nickan13/fellow-spiris#readme",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
