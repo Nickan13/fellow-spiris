@@ -1,6 +1,7 @@
 const AppError = require("../utils/AppError");
 const express = require("express");
 const router = express.Router();
+const platformWebhookLogRepo = require("../db/repositories/platformWebhookLogRepo");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -8,6 +9,67 @@ const draftMappingStore = require("../services/draftMappingStore");
 const ghlService = require("../services/ghlService");
 const ghlWritebackStore = require("../services/ghlWritebackStore");
 const { validateCreateDraftInput } = require("../utils/validators");
+
+router.post("/platform", async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const eventType =
+      body.type ||
+      body.event ||
+      body.webhookType ||
+      req.header("x-ghl-event") ||
+      "unknown";
+
+    const locationId =
+      body.locationId ||
+      body.companyId ||
+      body.data?.locationId ||
+      body.data?.companyId ||
+      null;
+
+    const invoiceId =
+      body.id ||
+      body.invoiceId ||
+      body.data?.id ||
+      body.data?.invoiceId ||
+      null;
+
+    await platformWebhookLogRepo.createLog({
+      eventType,
+      locationId,
+      invoiceId,
+      payload: body,
+      headers: {
+        "user-agent": req.header("user-agent") || null,
+        "x-wh-signature": req.header("x-wh-signature") || null,
+        "x-ghl-signature": req.header("x-ghl-signature") || null,
+        "x-ghl-event": req.header("x-ghl-event") || null
+      }
+    });
+
+    console.log("[platform-webhook] received", {
+      eventType,
+      locationId,
+      invoiceId
+    });
+
+    return res.status(200).json({
+      ok: true,
+      received: true,
+      eventType,
+      locationId,
+      invoiceId
+    });
+  } catch (err) {
+    console.error("[platform-webhook] error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "platform webhook failed"
+    });
+  }
+});
 
 router.post("/invoice/create-draft", async (req, res) => {
   try {

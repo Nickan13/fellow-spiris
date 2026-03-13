@@ -15,5 +15,6 @@ app.use("/oauth", oauthRoutes);
 app.use("/admin", adminRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api2", api2Routes);
+app.use("/api2/webhooks", webhookRoutes);
 
 module.exports = app;
