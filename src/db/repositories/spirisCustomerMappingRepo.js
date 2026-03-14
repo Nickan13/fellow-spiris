@@ -58,7 +58,21 @@ async function createMapping({
   );
 }
 
+async function countByLocationId(locationId) {
+  const row = await get(
+    `
+    SELECT COUNT(*) AS count
+    FROM spiris_customer_mappings
+    WHERE location_id = ?
+    `,
+    [locationId]
+  );
+
+  return row ? row.count : 0;
+}
+
 module.exports = {
   getBySpirisCustomerId,
-  createMapping
+  createMapping,
+  countByLocationId
 };
