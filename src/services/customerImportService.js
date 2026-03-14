@@ -158,6 +158,63 @@ async function importCustomersPage({
   };
 }
 
+async function importAllCustomers({
+  locationId,
+  pageSize = 50,
+  maxPages = 100
+}) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const totals = {
+    total: 0,
+    mapped: 0,
+    matched: 0,
+    created: 0,
+    skipped: 0,
+    failed: 0,
+    pagesProcessed: 0
+  };
+
+  const allResults = [];
+
+  for (let page = 1; page <= maxPages; page++) {
+    const result = await importCustomersPage({
+      locationId,
+      page,
+      pageSize
+    });
+
+    totals.total += result.stats.total;
+    totals.mapped += result.stats.mapped;
+    totals.matched += result.stats.matched;
+    totals.created += result.stats.created;
+    totals.skipped += result.stats.skipped;
+    totals.failed += result.stats.failed;
+    totals.pagesProcessed += 1;
+
+    allResults.push({
+      page,
+      stats: result.stats,
+      results: result.results
+    });
+
+    if (!result.stats.total || result.stats.total < pageSize) {
+      break;
+    }
+  }
+
+  return {
+    locationId,
+    pageSize,
+    maxPages,
+    totals,
+    pages: allResults
+  };
+}
+
 module.exports = {
-  importCustomersPage
+  importCustomersPage,
+  importAllCustomers
 };

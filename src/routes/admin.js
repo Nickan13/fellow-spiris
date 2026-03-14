@@ -155,4 +155,35 @@ router.post("/spiris/customers/import-page", async (req, res) => {
   }
 });
 
+router.post("/spiris/customers/import-all", async (req, res) => {
+  try {
+    const { locationId, pageSize = 50, maxPages = 100 } = req.body;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const result = await customerImportService.importAllCustomers({
+      locationId,
+      pageSize,
+      maxPages
+    });
+
+    return res.json({
+      ok: true,
+      ...result
+    });
+  } catch (err) {
+    console.error("[customer-import-all]", err);
+
+    return res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+  }
+});
+
 module.exports = router;
