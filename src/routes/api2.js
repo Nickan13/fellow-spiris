@@ -310,7 +310,6 @@ router.get("/app/spiris", async (req, res) => {
       "Content-Security-Policy",
       "frame-ancestors https://crm.fellow.se https://*.gohighlevel.com https://app.gohighlevel.com"
     );
-    res.setHeader("X-Frame-Options", "ALLOW-FROM https://crm.fellow.se");
 
     return res.send(`
 <!DOCTYPE html>
@@ -323,28 +322,55 @@ router.get("/app/spiris", async (req, res) => {
 body {
   font-family: Inter, sans-serif;
   padding: 30px;
+  color: #1f2937;
 }
 
 .card {
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 20px;
-  max-width: 700px;
+  padding: 24px;
+  max-width: 760px;
+  background: #fff;
 }
 
 h2 {
   margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.section h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.help-text {
+  margin: 0 0 14px 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .status {
   margin: 10px 0;
 }
 
-.actions {
+.actions-row {
   display: flex;
   gap: 10px;
+  align-items: center;
   flex-wrap: wrap;
-  margin-top: 16px;
 }
 
 button {
@@ -357,16 +383,16 @@ button {
   cursor: pointer;
 }
 
+button.secondary {
+  background: #8597b3;
+}
+
 select {
   padding: 10px 12px;
   font-size: 14px;
   border-radius: 6px;
   border: 1px solid #ccc;
   background: white;
-}
-
-button.secondary {
-  background: #8597b3;
 }
 
 .notice {
@@ -378,6 +404,7 @@ button.secondary {
 .error {
   color: #b00020;
   margin-top: 12px;
+  font-size: 14px;
 }
 </style>
 </head>
@@ -386,23 +413,49 @@ button.secondary {
 
 <div class="card">
 
-<h2>Spiris Integration</h2>
+  <h2>Spiris Integration</h2>
 
-<div id="status">Laddar integrationsstatus...</div>
+  <div id="status">Laddar integrationsstatus...</div>
 
-<div class="actions">
-  <button id="connectBtn">Koppla till Spiris</button>
-  <button class="secondary" id="importCustomersBtn">Importera kunder</button>
-  <label for="invoiceModeSelect"><b>Fakturaläge</b></label>
-    <select id="invoiceModeSelect">
-    <option value="draft">draft</option>
-    <option value="booked">booked</option>
-  </select>
-<button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
-</div>
+  <div class="section">
+    <h3>Koppla till Spiris</h3>
+    <p class="help-text">
+      Koppla ditt Spiris-konto till Fellow så att integrationen kan hämta kunder, artiklar och skicka fakturor.
+    </p>
+    <div class="actions-row">
+      <button id="connectBtn">Koppla till Spiris</button>
+    </div>
+  </div>
 
-<div class="notice" id="message"></div>
-<div class="error" id="error"></div>
+  <div class="section">
+    <h3>Importera kunder</h3>
+    <p class="help-text">
+      Importera kunder från Spiris till detta subaccount i Fellow. Befintliga mappingar återanvänds och nya kontakter skapas vid behov.
+    </p>
+    <div class="actions-row">
+      <button class="secondary" id="importCustomersBtn">Importera kunder</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Fakturaläge</h3>
+    <p class="help-text">
+      Välj om fakturor från Fellow ska skickas till Spiris som utkast eller bokföras direkt.
+    </p>
+    <div class="actions-row">
+      <select id="invoiceModeSelect">
+        <option value="draft">utkast</option>
+        <option value="booked">bokför direkt</option>
+      </select>
+      <button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
+    </div>
+    <p class="help-text">
+      Ändringen gäller nya fakturor för denna location. Redan skickade fakturor påverkas inte.
+    </p>
+  </div>
+
+  <div class="notice" id="message"></div>
+  <div class="error" id="error"></div>
 
 </div>
 
@@ -416,6 +469,18 @@ function setMessage(text) {
 
 function setError(text) {
   document.getElementById("error").textContent = text || "";
+}
+
+function formatInvoiceMode(mode) {
+  if (mode === "draft") {
+    return "utkast";
+  }
+
+  if (mode === "booked") {
+    return "bokför direkt";
+  }
+
+  return mode || "";
 }
 
 async function loadStatus() {
@@ -432,23 +497,23 @@ async function loadStatus() {
   const s = data.status;
 
   document.getElementById("status").innerHTML = \`
-    <div class="status"><b>App installerad:</b> \${s.appInstalled}</div>
-    <div class="status"><b>Spiris ansluten:</b> \${s.spirisConnected}</div>
-    <div class="status"><b>Fakturaläge:</b> \${s.spirisInvoiceMode}</div>
+    <div class="status"><b>App installerad:</b> \${s.appInstalled ? "Ja" : "Nej"}</div>
+    <div class="status"><b>Spiris ansluten:</b> \${s.spirisConnected ? "Ja" : "Nej"}</div>
+    <div class="status"><b>Fakturaläge:</b> \${formatInvoiceMode(s.spirisInvoiceMode)}</div>
     <div class="status"><b>Synkade kunder:</b> \${s.customerMappingsCount}</div>
     <div class="status"><b>Produktmappingar:</b> \${s.productMappingsCount}</div>
     <div class="status"><b>Skickade fakturor:</b> \${s.invoiceMappingsCount}</div>
     <div class="status"><b>Retry-jobb:</b> \${s.retryJobsCount}</div>
     <div class="status"><b>Misslyckade jobb:</b> \${s.failedJobsCount}</div>
   \`;
+
+  document.getElementById("invoiceModeSelect").value = s.spirisInvoiceMode;
 }
 
 document.getElementById("connectBtn").onclick = function () {
-  window.location.href =
+  window.top.location.href =
     "/api2/integration/connect-spiris/" + encodeURIComponent(locationId);
 };
-
-document.getElementById("invoiceModeSelect").value = s.spirisInvoiceMode;
 
 document.getElementById("importCustomersBtn").onclick = async function () {
   try {
@@ -499,7 +564,7 @@ document.getElementById("saveInvoiceModeBtn").onclick = async function () {
       throw new Error(saveData.error || "Failed to update invoice mode");
     }
 
-    setMessage("Fakturaläge sparat: " + selectedMode);
+    setMessage("Fakturaläge sparat: " + formatInvoiceMode(selectedMode));
     await loadStatus();
   } catch (err) {
     setError(err.message || "Failed to update invoice mode");
@@ -516,7 +581,6 @@ loadStatus().catch((err) => {
     `);
   } catch (err) {
     console.error("app spiris page error:", err.message);
-
     return res.status(500).send("Failed to load Spiris app page");
   }
 });
