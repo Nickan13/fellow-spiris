@@ -403,15 +403,26 @@ select {
 
 .notice {
   margin-top: 16px;
-  color: #444;
+  color: #1f2937;
   font-size: 14px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px;
+  min-height: 20px;
 }
 
 .error {
   color: #b00020;
   margin-top: 12px;
   font-size: 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 12px;
+  min-height: 20px;
 }
+
 </style>
 </head>
 
@@ -424,61 +435,70 @@ select {
   <div id="status">Laddar integrationsstatus...</div>
 
   <div class="section">
-    <h3>Koppla till Spiris</h3>
+    <h3>Koppla Spiris till Fellow</h3>
     <p class="help-text">
       Koppla ditt Spiris-konto till Fellow så att integrationen kan hämta kunder, synka produkter och skicka fakturor.
+    </p>
+    <p class="help-text" id="connectHelpText">
+      När kopplingen är klar uppdateras sidan automatiskt.
     </p>
     <div class="actions-row">
       <button id="connectBtn">Koppla till Spiris</button>
       <button class="secondary" id="disconnectBtn" style="display:none;">Koppla bort Spiris</button>
     </div>
-    <p class="help-text" id="connectHelpText">
-      När kopplingen är klar uppdateras sidan automatiskt.
-    </p>
   </div>
 
   <div class="section">
-    <h3>Importera kunder</h3>
+    <h3>Kunder</h3>
     <p class="help-text">
       Importera kunder från Spiris till detta subaccount i Fellow. Befintliga mappingar återanvänds och nya kontakter skapas vid behov.
+    </p>
+    <p class="help-text">
+      Funktionen hämtar kunder från Spiris och kopplar dem till rätt kontakter i Fellow.
     </p>
     <div class="actions-row">
       <button class="secondary" id="importCustomersBtn">Importera kunder</button>
     </div>
-    <p class="help-text">
-      Funktionen hämtar kunder från Spiris och kopplar dem till rätt kontakter i Fellow.
-    </p>
   </div>
 
   <div class="section">
-    <h3>Fakturaläge</h3>
+    <h3>Fakturor</h3>
     <p class="help-text">
-      Välj om fakturor från Fellow ska skickas till Spiris som utkast eller bokföras direkt.
+      Fakturor som skapas i Fellow går automatiskt över till Spiris när ni <b>skickar</b> fakturan. Om ni av någon anledning behöver skicka samma faktura en gång till händer ingenting i Spiris (inga dubletter).
+    </p>
+    <p class="help-text">
+      Välj om fakturor från Fellow ska skickas till Spiris som utkast eller om de ska bokföras direkt. Om du väljer att skapa fakturautkast behöver du logga in i Spiris och hantera den för att den ska bokföras. Om du väjer Bokför direkt behöver du inte hantera fakturan mer, utan den bokförs direkt i Spiris.
+    </p>
+    <p class="help-text">
+      Ändring av fakturaläge gäller nya fakturor. Redan skickade fakturor påverkas inte.
     </p>
     <div class="actions-row">
       <select id="invoiceModeSelect">
-        <option value="draft">utkast</option>
-        <option value="booked">bokför direkt</option>
+        <option value="draft">Utkast</option>
+        <option value="booked">Bokför direkt</option>
       </select>
       <button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
     </div>
+  </div>
+
+  <div class="section">
+    <h3>Produkter</h3>
     <p class="help-text">
-      Ändringen gäller nya fakturor för denna location. Redan skickade fakturor påverkas inte.
+      Produkter och artiklar synkas automatiskt mellan Fellow och Spiris.
+    </p>
+    <p class="help-text">
+      Här kan du se senaste synkning och om det finns något som inte är synkat.
     </p>
   </div>
 
   <div class="section">
-    <h3>Produktsynk</h3>
+    <h3>Status och meddelanden</h3>
     <p class="help-text">
-      Produkter och artiklar synkas automatiskt från Spiris i bakgrunden. Du behöver normalt inte starta någon manuell synk här.
+      Här visas resultat från import, koppling och ändringar i fakturaläge.
     </p>
-    <p class="help-text">
-      Nästa steg senare blir att visa senaste artikelsync och eventuella produkter som saknar mapping.
-    </p>
+    <div class="notice" id="message"></div>
+    <div class="error" id="error"></div>
   </div>
-
-  <div class="notice" id="message"></div>
-  <div class="error" id="error"></div>
 
 </div>
 
@@ -496,8 +516,8 @@ function setError(text) {
 }
 
 function formatInvoiceMode(mode) {
-  if (mode === "draft") return "utkast";
-  if (mode === "booked") return "bokför direkt";
+  if (mode === "draft") return "Utkast";
+  if (mode === "booked") return "Bokför direkt";
   return mode || "";
 }
 
@@ -509,7 +529,7 @@ function updateConnectButton(isConnected) {
   if (isConnected) {
     connectBtn.style.display = "none";
     disconnectBtn.style.display = "inline-block";
-    help.textContent = "Spiris är anslutet för denna location. Om du vill byta konto kan du först koppla bort integrationen.";
+    help.textContent = "Spiris är anslutet för. Klicka bara på knappen om du vill koppla bort integrationen.";
   } else {
     connectBtn.style.display = "inline-block";
     disconnectBtn.style.display = "none";
@@ -535,7 +555,7 @@ async function loadStatus() {
     <div class="status"><b>Spiris ansluten:</b> \${s.spirisConnected ? "Ja" : "Nej"}</div>
     <div class="status"><b>Fakturaläge:</b> \${formatInvoiceMode(s.spirisInvoiceMode)}</div>
     <div class="status"><b>Synkade kunder:</b> \${s.customerMappingsCount}</div>
-    <div class="status"><b>Produktmappingar:</b> \${s.productMappingsCount}</div>
+    <div class="status"><b>Synkade produkter:</b> \${s.productMappingsCount}</div>
     <div class="status"><b>Skickade fakturor:</b> \${s.invoiceMappingsCount}</div>
     <div class="status"><b>Retry-jobb:</b> \${s.retryJobsCount}</div>
     <div class="status"><b>Misslyckade jobb:</b> \${s.failedJobsCount}</div>
@@ -632,10 +652,18 @@ document.getElementById("importCustomersBtn").onclick = async function () {
       body: JSON.stringify({ locationId })
     });
 
-    const data = await res.json();
+    const rawText = await res.text();
+
+    let data = null;
+
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      throw new Error("Import endpoint returned non-JSON response: " + rawText.slice(0, 300));
+    }
 
     if (!res.ok || !data.ok) {
-      throw new Error(data.error || "Customer import failed");
+      throw new Error(data.error || data.details || "Customer import failed");
     }
 
     setMessage("Kundimport klar.");
@@ -647,10 +675,14 @@ document.getElementById("importCustomersBtn").onclick = async function () {
 
 document.getElementById("saveInvoiceModeBtn").onclick = async function () {
   try {
-    setMessage("Uppdaterar fakturaläge...");
+    setMessage("Sparar fakturaläge...");
     setError("");
 
     const selectedMode = document.getElementById("invoiceModeSelect").value;
+    const saveButton = document.getElementById("saveInvoiceModeBtn");
+
+    saveButton.disabled = true;
+    saveButton.textContent = "Sparar...";
 
     const saveRes = await fetch("/api2/settings/" + encodeURIComponent(locationId) + "/invoice-mode", {
       method: "POST",
@@ -668,10 +700,14 @@ document.getElementById("saveInvoiceModeBtn").onclick = async function () {
       throw new Error(saveData.error || "Failed to update invoice mode");
     }
 
-    setMessage("Fakturaläge sparat: " + formatInvoiceMode(selectedMode));
     await loadStatus();
+    setMessage("Fakturaläget har sparats som: " + formatInvoiceMode(selectedMode));
   } catch (err) {
     setError(err.message || "Failed to update invoice mode");
+  } finally {
+    const saveButton = document.getElementById("saveInvoiceModeBtn");
+    saveButton.disabled = false;
+    saveButton.textContent = "Spara fakturaläge";
   }
 };
 
@@ -707,7 +743,7 @@ router.post("/integration/disconnect-spiris/:locationId", async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "Spiris disconnected",
+      message: "Spiris bortkopplat",
       locationId,
       upstream: response.data
     });
@@ -716,7 +752,7 @@ router.post("/integration/disconnect-spiris/:locationId", async (req, res) => {
 
     return res.status(500).json({
       ok: false,
-      error: "Failed to disconnect Spiris",
+      error: "Misslyckades med att koppla bort Spiris",
       details: err.response?.data || err.message
     });
   }
