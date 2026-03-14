@@ -105,6 +105,23 @@ function runMigrations() {
       )
     `);
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS spiris_customer_mappings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location_id TEXT NOT NULL,
+        spiris_customer_id TEXT NOT NULL,
+        fellow_contact_id TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(location_id, spiris_customer_id)
+      )
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_spiris_customer_mappings_location
+        ON spiris_customer_mappings(location_id)
+    `);
+
     console.log("Database migrations completed");
 
   });

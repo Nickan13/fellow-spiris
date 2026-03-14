@@ -48,7 +48,44 @@ async function findContactByEmail(locationId, email) {
   return contacts[0];
 }
 
+async function createContact(locationId, input) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const headers = await getHeadersForLocation(locationId);
+
+  const payload = {
+    locationId,
+    firstName: input.firstName || "",
+    lastName: input.lastName || "",
+    name: input.name || "",
+    email: input.email || "",
+    phone: input.phone || "",
+    address1: input.address1 || "",
+    city: input.city || "",
+    postalCode: input.postalCode || "",
+    country: input.country || "SE",
+    companyName: input.companyName || ""
+  };
+
+  const response = await axios.post(
+    `${env.ghlApiBase}/contacts/`,
+    payload,
+    {
+      headers
+    }
+  );
+
+  return {
+    request: payload,
+    response: response.data,
+    contact: response.data?.contact || response.data || null
+  };
+}
+
 module.exports = {
   getHeadersForLocation,
-  findContactByEmail
+  findContactByEmail,
+  createContact
 };
