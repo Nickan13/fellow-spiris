@@ -199,7 +199,7 @@ router.get("/integration/status/:locationId", async (req, res) => {
     }
 
     // 1. Check if Marketplace app token exists
-    const token = await platformAppTokenRepo.getByLocationId(locationId);
+    const token = await platformAppTokenRepo.getTokenByLocationId(locationId);
 
     const appInstalled = !!token;
 
