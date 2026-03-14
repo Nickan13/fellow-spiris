@@ -357,6 +357,14 @@ button {
   cursor: pointer;
 }
 
+select {
+  padding: 10px 12px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: white;
+}
+
 button.secondary {
   background: #8597b3;
 }
@@ -385,7 +393,12 @@ button.secondary {
 <div class="actions">
   <button id="connectBtn">Koppla till Spiris</button>
   <button class="secondary" id="importCustomersBtn">Importera kunder</button>
-  <button class="secondary" id="toggleInvoiceModeBtn">Växla faktura utkast/faktura direkt</button>
+  <label for="invoiceModeSelect"><b>Fakturaläge</b></label>
+    <select id="invoiceModeSelect">
+    <option value="draft">draft</option>
+    <option value="booked">booked</option>
+  </select>
+<button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
 </div>
 
 <div class="notice" id="message"></div>
@@ -435,6 +448,8 @@ document.getElementById("connectBtn").onclick = function () {
     "/api2/integration/connect-spiris/" + encodeURIComponent(locationId);
 };
 
+document.getElementById("invoiceModeSelect").value = s.spirisInvoiceMode;
+
 document.getElementById("importCustomersBtn").onclick = async function () {
   try {
     setMessage("Importerar kunder...");
@@ -461,20 +476,12 @@ document.getElementById("importCustomersBtn").onclick = async function () {
   }
 };
 
-document.getElementById("toggleInvoiceModeBtn").onclick = async function () {
+document.getElementById("saveInvoiceModeBtn").onclick = async function () {
   try {
     setMessage("Uppdaterar fakturaläge...");
     setError("");
 
-    const statusRes = await fetch("/api2/integration/status/" + encodeURIComponent(locationId));
-    const statusData = await statusRes.json();
-
-    if (!statusRes.ok || !statusData.ok || !statusData.status) {
-      throw new Error(statusData.error || "Failed to fetch current invoice mode");
-    }
-
-    const current = statusData.status.spirisInvoiceMode;
-    const next = current === "booked" ? "draft" : "booked";
+    const selectedMode = document.getElementById("invoiceModeSelect").value;
 
     const saveRes = await fetch("/api2/settings/" + encodeURIComponent(locationId) + "/invoice-mode", {
       method: "POST",
@@ -482,7 +489,7 @@ document.getElementById("toggleInvoiceModeBtn").onclick = async function () {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        spirisInvoiceMode: next
+        spirisInvoiceMode: selectedMode
       })
     });
 
@@ -492,7 +499,7 @@ document.getElementById("toggleInvoiceModeBtn").onclick = async function () {
       throw new Error(saveData.error || "Failed to update invoice mode");
     }
 
-    setMessage("Fakturaläge ändrat till: " + next);
+    setMessage("Fakturaläge sparat: " + selectedMode);
     await loadStatus();
   } catch (err) {
     setError(err.message || "Failed to update invoice mode");
