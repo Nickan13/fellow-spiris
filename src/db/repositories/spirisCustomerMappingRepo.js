@@ -58,6 +58,26 @@ async function createMapping({
   );
 }
 
+//funktion för att delete'a kontakter när jag testat importen
+async function deleteByLocationId(locationId) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const result = await run(
+    `
+    DELETE FROM spiris_customer_mappings
+    WHERE location_id = ?
+    `,
+    [locationId]
+  );
+
+  return {
+    locationId,
+    deletedRows: result.changes || 0
+  };
+}
+
 async function countByLocationId(locationId) {
   const row = await get(
     `
@@ -74,5 +94,6 @@ async function countByLocationId(locationId) {
 module.exports = {
   getBySpirisCustomerId,
   createMapping,
-  countByLocationId
+  countByLocationId,
+  deleteByLocationId
 };

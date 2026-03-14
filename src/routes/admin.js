@@ -186,4 +186,37 @@ router.post("/spiris/customers/import-all", async (req, res) => {
   }
 });
 
+const spirisCustomerMappingRepo = require("../db/repositories/spirisCustomerMappingRepo");
+
+router.post("/spiris/customers/reset-mappings", express.json(), async (req, res) => {
+  try {
+    const { locationId } = req.body || {};
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const result = await spirisCustomerMappingRepo.deleteByLocationId(locationId);
+
+    return res.json({
+      ok: true,
+      message: "Customer mappings reset",
+      locationId,
+      deletedRows: result.deletedRows
+    });
+
+  } catch (err) {
+    console.error("reset mappings error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to reset customer mappings",
+      details: err.message
+    });
+  }
+});
+
 module.exports = router;
