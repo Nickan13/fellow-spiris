@@ -291,4 +291,108 @@ router.get("/integration/connect-spiris/:locationId", async (req, res) => {
   }
 });
 
+router.get("/app/spiris", async (req, res) => {
+  const { locationId } = req.query;
+
+  if (!locationId) {
+    return res.status(400).send("Missing locationId");
+  }
+
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Spiris Integration</title>
+
+<style>
+body {
+  font-family: Inter, sans-serif;
+  padding: 30px;
+}
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 600px;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.status {
+  margin: 10px 0;
+}
+
+button {
+  padding: 10px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+  background: #4CAF50;
+  color: white;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #1976d2;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>Spiris Integration</h2>
+
+<div id="status">Loading integration status...</div>
+
+<br/>
+
+<button id="connectBtn">Connect Spiris</button>
+
+</div>
+
+<script>
+
+const params = new URLSearchParams(window.location.search);
+const locationId = params.get("locationId");
+
+async function loadStatus() {
+
+  const res = await fetch("/api2/integration/status/" + locationId);
+  const data = await res.json();
+
+  const s = data.status;
+
+  document.getElementById("status").innerHTML = \`
+    <div class="status"><b>App installed:</b> \${s.appInstalled}</div>
+    <div class="status"><b>Spiris connected:</b> \${s.spirisConnected}</div>
+    <div class="status"><b>Invoice mode:</b> \${s.spirisInvoiceMode}</div>
+    <div class="status"><b>Customer mappings:</b> \${s.customerMappingsCount}</div>
+    <div class="status"><b>Product mappings:</b> \${s.productMappingsCount}</div>
+    <div class="status"><b>Invoices sent:</b> \${s.invoiceMappingsCount}</div>
+    <div class="status"><b>Retry jobs:</b> \${s.retryJobsCount}</div>
+    <div class="status"><b>Failed jobs:</b> \${s.failedJobsCount}</div>
+  \`;
+}
+
+document.getElementById("connectBtn").onclick = function() {
+  window.location.href =
+    "/api2/integration/connect-spiris/" + locationId;
+};
+
+loadStatus();
+
+</script>
+
+</body>
+</html>
+`);
+});
+
 module.exports = router;
