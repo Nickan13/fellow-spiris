@@ -118,8 +118,22 @@ async function listMappingsByLocation(locationId) {
   }));
 }
 
+async function countByLocationId(locationId) {
+  const row = await get(
+    `
+    SELECT COUNT(*) AS count
+    FROM fellow_product_mappings
+    WHERE location_id = ?
+    `,
+    [locationId]
+  );
+
+  return row ? row.count : 0;
+}
+
 module.exports = {
   upsertMapping,
   getMappingByProductId,
-  listMappingsByLocation
+  listMappingsByLocation,
+  countByLocationId
 };
