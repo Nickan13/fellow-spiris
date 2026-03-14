@@ -28,14 +28,22 @@ async function findContactByEmail(locationId, email) {
 
   const headers = await getHeadersForLocation(locationId);
 
-  const response = await axios.get(
+  const response = await axios.post(
     `${env.ghlApiBase}/contacts/search`,
     {
-      headers,
-      params: {
-        locationId,
-        query: email
-      }
+      locationId,
+      page: 1,
+      pageLimit: 10,
+      filters: [
+        {
+          field: "email",
+          operator: "eq",
+          value: email
+        }
+      ]
+    },
+    {
+      headers
     }
   );
 
