@@ -3,6 +3,31 @@ const tokenService = require("./tokenService");
 const ghlContactService = require("./ghlContactService");
 const spirisCustomerMappingRepo = require("../db/repositories/spirisCustomerMappingRepo");
 
+function splitPrivatePersonName(name) {
+  const trimmed = String(name || "").trim();
+
+  if (!trimmed) {
+    return {
+      firstName: "",
+      lastName: ""
+    };
+  }
+
+  const parts = trimmed.split(/\s+/);
+
+  if (parts.length === 1) {
+    return {
+      firstName: parts[0],
+      lastName: ""
+    };
+  }
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(" ")
+  };
+}
+
 async function importCustomersPage({
   locationId,
   page = 1,
@@ -86,17 +111,40 @@ async function importCustomersPage({
 
         stats.matched++;
         status = "matched";
-      } else {
-        const created = await ghlContactService.createContact(locationId, {
-          name,
-          email,
-          phone,
-          address1,
-          city,
-          postalCode,
-          country,
-          companyName: customer.IsPrivatePerson ? "" : name
-        });
+            } else {
+        const isPrivatePerson = !!customer.IsPrivatePerson;
+
+        let created = null;
+
+        if (isPrivatePerson) {
+          const personName = splitPrivatePersonName(name);
+
+          created = await ghlContactService.createContact(locationId, {
+            firstName: personName.firstName,
+            lastName: personName.lastName,
+            name,
+            email,
+            phone,
+            address1,
+            city,
+            postalCode,
+            country,
+            companyName: ""
+          });
+        } else {
+          created = await ghlContactService.createContact(locationId, {
+            firstName: name,
+            lastName: "",
+            name,
+            email,
+            phone,
+            address1,
+            city,
+            postalCode,
+            country,
+            companyName: name
+          });
+        }
 
         fellowContactId =
           created.contact?.id ||
@@ -105,6 +153,35 @@ async function importCustomersPage({
 
         if (!fellowContactId) {
           throw new Error(`Created contact missing id for spirisCustomerId=${spirisCustomerId}`);
+        }
+
+        if (!isPrivatePerson) {
+          const createdBusiness = await ghlContactService.createBusiness(locationId, {
+            name,
+            email,
+            phone,
+            address1,
+            city,
+            postalCode,
+            country
+          });
+
+          const businessId =
+            createdBusiness.business?.id ||
+            createdBusiness.business?._id ||
+            createdBusiness.business?.businessId ||
+            createdBusiness.response?.id ||
+            null;
+
+          if (!businessId) {
+            throw new Error(`Created business missing id for spirisCustomerId=${spirisCustomerId}`);
+          }
+
+          await ghlContactService.attachContactToBusiness(
+            locationId,
+            fellowContactId,
+            businessId
+          );
         }
 
         await spirisCustomerMappingRepo.createMapping({
