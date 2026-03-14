@@ -7,6 +7,7 @@ const platformAppTokenRepo = require("../db/repositories/platformAppTokenRepo");
 const integrationSettingsRepo = require("../db/repositories/integrationSettingsRepo");
 const spirisCustomerMappingRepo = require("../db/repositories/spirisCustomerMappingRepo");
 const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
+const tokenService = require("../services/tokenService");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -219,6 +220,15 @@ router.get("/integration/status/:locationId", async (req, res) => {
     const failedJobsCount =
       await invoiceJobRepo.countFailedJobsByLocationId(locationId);
 
+    let spirisConnected = false;
+
+      try {
+        await tokenService.getAccessTokenForLocation(locationId);
+        spirisConnected = true;
+      } catch (err) {
+        spirisConnected = false;
+      }
+
     return res.json({
       ok: true,
       status: {
@@ -227,6 +237,7 @@ router.get("/integration/status/:locationId", async (req, res) => {
         spirisInvoiceMode,
         customerMappingsCount,
         retryJobsCount,
+        failedJobsCount,
         failedJobsCount
       }
     });
