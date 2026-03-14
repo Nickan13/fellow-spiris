@@ -331,13 +331,13 @@ button {
   font-size: 14px;
   border-radius: 6px;
   border: none;
-  background: #4CAF50;
+  background: #82358b;
   color: white;
   cursor: pointer;
 }
 
 button.secondary {
-  background: #1976d2;
+  background: #8597b3;
 }
 
 </style>
@@ -354,6 +354,8 @@ button.secondary {
 <br/>
 
 <button id="connectBtn">Connect Spiris</button>
+<button class="secondary" id="importCustomersBtn">Import customers</button>
+<button class="secondary" id="toggleInvoiceModeBtn">Toggle invoice mode</button>
 
 </div>
 
@@ -384,6 +386,48 @@ async function loadStatus() {
 document.getElementById("connectBtn").onclick = function() {
   window.location.href =
     "/api2/integration/connect-spiris/" + locationId;
+};
+
+document.getElementById("importCustomersBtn").onclick = async function() {
+
+  const res = await fetch("/api2/admin/spiris/customers/import-all", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      locationId
+    })
+  });
+
+  const data = await res.json();
+
+  alert("Customer import finished");
+
+  loadStatus();
+};
+
+document.getElementById("toggleInvoiceModeBtn").onclick = async function() {
+
+  const res = await fetch("/api2/integration/status/" + locationId);
+  const data = await res.json();
+
+  const current = data.status.spirisInvoiceMode;
+  const next = current === "booked" ? "draft" : "booked";
+
+  await fetch("/api2/settings/" + locationId + "/invoice-mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      spirisInvoiceMode: next
+    })
+  });
+
+  alert("Invoice mode changed to: " + next);
+
+  loadStatus();
 };
 
 loadStatus();
