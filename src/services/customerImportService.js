@@ -124,7 +124,7 @@ async function importCustomersPage({
         status,
         fellowContactId
       });
-    } catch (err) {
+        } catch (err) {
       stats.failed++;
 
       results.push({
@@ -133,6 +133,7 @@ async function importCustomersPage({
         email,
         status: "failed",
         error: err.message,
+        providerResponse: err.response?.data || null,
         fellowContactId: null
       });
 
@@ -142,7 +143,8 @@ async function importCustomersPage({
           locationId,
           spirisCustomerId,
           email,
-          error: err.message
+          error: err.message,
+          providerResponse: err.response?.data || null
         }
       );
     }
