@@ -292,13 +292,27 @@ router.get("/integration/connect-spiris/:locationId", async (req, res) => {
 });
 
 router.get("/app/spiris", async (req, res) => {
-  const { locationId } = req.query;
+  try {
+    const { locationId } = req.query;
 
-  if (!locationId) {
-    return res.status(400).send("Missing locationId");
-  }
+    if (!locationId) {
+      return res.status(400).send("Missing locationId");
+    }
 
-  res.send(`
+    const appToken = await platformAppTokenRepo.getTokenByLocationId(locationId);
+
+    if (!appToken) {
+      return res.status(403).send("App is not installed for this location");
+    }
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader(
+      "Content-Security-Policy",
+      "frame-ancestors https://crm.fellow.se https://*.gohighlevel.com https://app.gohighlevel.com"
+    );
+    res.setHeader("X-Frame-Options", "ALLOW-FROM https://crm.fellow.se");
+
+    return res.send(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -315,7 +329,7 @@ body {
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 20px;
-  max-width: 600px;
+  max-width: 700px;
 }
 
 h2 {
@@ -324,6 +338,13 @@ h2 {
 
 .status {
   margin: 10px 0;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
 }
 
 button {
@@ -340,6 +361,16 @@ button.secondary {
   background: #8597b3;
 }
 
+.notice {
+  margin-top: 16px;
+  color: #444;
+  font-size: 14px;
+}
+
+.error {
+  color: #b00020;
+  margin-top: 12px;
+}
 </style>
 </head>
 
@@ -349,94 +380,138 @@ button.secondary {
 
 <h2>Spiris Integration</h2>
 
-<div id="status">Loading integration status...</div>
+<div id="status">Laddar integrationsstatus...</div>
 
-<br/>
+<div class="actions">
+  <button id="connectBtn">Koppla till Spiris</button>
+  <button class="secondary" id="importCustomersBtn">Importera kunder</button>
+  <button class="secondary" id="toggleInvoiceModeBtn">Växla faktura utkast/faktura direkt</button>
+</div>
 
-<button id="connectBtn">Connect Spiris</button>
-<button class="secondary" id="importCustomersBtn">Import customers</button>
-<button class="secondary" id="toggleInvoiceModeBtn">Toggle invoice mode</button>
+<div class="notice" id="message"></div>
+<div class="error" id="error"></div>
 
 </div>
 
 <script>
-
 const params = new URLSearchParams(window.location.search);
 const locationId = params.get("locationId");
 
-async function loadStatus() {
+function setMessage(text) {
+  document.getElementById("message").textContent = text || "";
+}
 
-  const res = await fetch("/api2/integration/status/" + locationId);
+function setError(text) {
+  document.getElementById("error").textContent = text || "";
+}
+
+async function loadStatus() {
+  setMessage("");
+  setError("");
+
+  const res = await fetch("/api2/integration/status/" + encodeURIComponent(locationId));
   const data = await res.json();
+
+  if (!res.ok || !data.ok || !data.status) {
+    throw new Error(data.error || "Failed to load integration status");
+  }
 
   const s = data.status;
 
   document.getElementById("status").innerHTML = \`
-    <div class="status"><b>App installed:</b> \${s.appInstalled}</div>
-    <div class="status"><b>Spiris connected:</b> \${s.spirisConnected}</div>
-    <div class="status"><b>Invoice mode:</b> \${s.spirisInvoiceMode}</div>
-    <div class="status"><b>Customer mappings:</b> \${s.customerMappingsCount}</div>
-    <div class="status"><b>Product mappings:</b> \${s.productMappingsCount}</div>
-    <div class="status"><b>Invoices sent:</b> \${s.invoiceMappingsCount}</div>
-    <div class="status"><b>Retry jobs:</b> \${s.retryJobsCount}</div>
-    <div class="status"><b>Failed jobs:</b> \${s.failedJobsCount}</div>
+    <div class="status"><b>App installerad:</b> \${s.appInstalled}</div>
+    <div class="status"><b>Spiris ansluten:</b> \${s.spirisConnected}</div>
+    <div class="status"><b>Fakturaläge:</b> \${s.spirisInvoiceMode}</div>
+    <div class="status"><b>Synkade kunder:</b> \${s.customerMappingsCount}</div>
+    <div class="status"><b>Produktmappingar:</b> \${s.productMappingsCount}</div>
+    <div class="status"><b>Skickade fakturor:</b> \${s.invoiceMappingsCount}</div>
+    <div class="status"><b>Retry-jobb:</b> \${s.retryJobsCount}</div>
+    <div class="status"><b>Misslyckade jobb:</b> \${s.failedJobsCount}</div>
   \`;
 }
 
-document.getElementById("connectBtn").onclick = function() {
+document.getElementById("connectBtn").onclick = function () {
   window.location.href =
-    "/api2/integration/connect-spiris/" + locationId;
+    "/api2/integration/connect-spiris/" + encodeURIComponent(locationId);
 };
 
-document.getElementById("importCustomersBtn").onclick = async function() {
+document.getElementById("importCustomersBtn").onclick = async function () {
+  try {
+    setMessage("Importerar kunder...");
+    setError("");
 
-  const res = await fetch("/api2/admin/spiris/customers/import-all", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      locationId
-    })
-  });
+    const res = await fetch("/api2/admin/spiris/customers/import-all", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ locationId })
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  alert("Customer import finished");
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Customer import failed");
+    }
 
-  loadStatus();
+    setMessage("Kundimport klar.");
+    await loadStatus();
+  } catch (err) {
+    setError(err.message || "Customer import failed");
+  }
 };
 
-document.getElementById("toggleInvoiceModeBtn").onclick = async function() {
+document.getElementById("toggleInvoiceModeBtn").onclick = async function () {
+  try {
+    setMessage("Uppdaterar fakturaläge...");
+    setError("");
 
-  const res = await fetch("/api2/integration/status/" + locationId);
-  const data = await res.json();
+    const statusRes = await fetch("/api2/integration/status/" + encodeURIComponent(locationId));
+    const statusData = await statusRes.json();
 
-  const current = data.status.spirisInvoiceMode;
-  const next = current === "booked" ? "draft" : "booked";
+    if (!statusRes.ok || !statusData.ok || !statusData.status) {
+      throw new Error(statusData.error || "Failed to fetch current invoice mode");
+    }
 
-  await fetch("/api2/settings/" + locationId + "/invoice-mode", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      spirisInvoiceMode: next
-    })
-  });
+    const current = statusData.status.spirisInvoiceMode;
+    const next = current === "booked" ? "draft" : "booked";
 
-  alert("Invoice mode changed to: " + next);
+    const saveRes = await fetch("/api2/settings/" + encodeURIComponent(locationId) + "/invoice-mode", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        spirisInvoiceMode: next
+      })
+    });
 
-  loadStatus();
+    const saveData = await saveRes.json();
+
+    if (!saveRes.ok || !saveData.ok) {
+      throw new Error(saveData.error || "Failed to update invoice mode");
+    }
+
+    setMessage("Fakturaläge ändrat till: " + next);
+    await loadStatus();
+  } catch (err) {
+    setError(err.message || "Failed to update invoice mode");
+  }
 };
 
-loadStatus();
-
+loadStatus().catch((err) => {
+  setError(err.message || "Failed to load integration status");
+});
 </script>
 
 </body>
 </html>
-`);
+    `);
+  } catch (err) {
+    console.error("app spiris page error:", err.message);
+
+    return res.status(500).send("Failed to load Spiris app page");
+  }
 });
 
 module.exports = router;
