@@ -67,7 +67,6 @@ async function createContact(locationId, input) {
     locationId,
     firstName: input.firstName || "",
     lastName: input.lastName || "",
-    name: input.name || "",
     email: input.email || "",
     phone: input.phone || "",
     address1: input.address1 || "",
