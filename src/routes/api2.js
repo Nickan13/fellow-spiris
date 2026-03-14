@@ -8,6 +8,8 @@ const integrationSettingsRepo = require("../db/repositories/integrationSettingsR
 const spirisCustomerMappingRepo = require("../db/repositories/spirisCustomerMappingRepo");
 const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
 const tokenService = require("../services/tokenService");
+const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
+const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -220,6 +222,12 @@ router.get("/integration/status/:locationId", async (req, res) => {
     const failedJobsCount =
       await invoiceJobRepo.countFailedJobsByLocationId(locationId);
 
+    const productMappingsCount =
+      await fellowProductMappingRepo.countByLocationId(locationId);
+
+    const invoiceMappingsCount =
+      await spirisInvoiceMappingRepo.countByLocationId(locationId);
+
     let spirisConnected = false;
 
       try {
@@ -234,10 +242,12 @@ router.get("/integration/status/:locationId", async (req, res) => {
       status: {
         locationId,
         appInstalled,
+        spirisConnected,
         spirisInvoiceMode,
         customerMappingsCount,
+        productMappingsCount,
+        invoiceMappingsCount,
         retryJobsCount,
-        failedJobsCount,
         failedJobsCount
       }
     });
