@@ -4,6 +4,7 @@ const customerResolver = require("./customerResolver");
 const articleCache = require("./articleCache");
 const articleStore = require("./articleStore");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
+const integrationSettingsRepo = require("../db/repositories/integrationSettingsRepo");
 
 function toIsoDate(value) {
   if (!value) {
@@ -214,7 +215,15 @@ async function createInvoiceFromPlatformPayload(payload) {
     Rows: rows
   };
 
-  const invoice = await spirisService.createInvoice(accessToken, requestPayload);
+  const invoiceMode = await integrationSettingsRepo.getInvoiceModeByLocationId(locationId);
+
+  let invoice;
+
+  if (invoiceMode === "draft") {
+    invoice = await spirisService.createInvoiceDraft(accessToken, requestPayload);
+  } else {
+    invoice = await spirisService.createInvoice(accessToken, requestPayload);
+  }
 
   return {
     customer,

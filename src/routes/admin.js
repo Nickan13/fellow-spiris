@@ -3,6 +3,7 @@ const router = express.Router();
 const tokenService = require("../services/tokenService");
 const articleSyncService = require("../services/articleSyncService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
+const customerImportService = require("../services/customerImportService");
 
 router.get("/spiris/company-settings", async (req, res) => {
   try {
@@ -115,6 +116,38 @@ router.get("/mappings/products", async (req, res) => {
       rows
     });
   } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+  }
+});
+
+router.post("/spiris/customers/import-page", async (req, res) => {
+  try {
+    const { locationId, page = 1, pageSize = 50 } = req.body;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const result = await customerImportService.importCustomersPage({
+      locationId,
+      page,
+      pageSize
+    });
+
+    return res.json({
+      ok: true,
+      ...result
+    });
+
+  } catch (err) {
+    console.error("[customer-import]", err);
+
     return res.status(500).json({
       ok: false,
       error: err.message

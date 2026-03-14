@@ -3,13 +3,23 @@ const express = require("express");
 const router = express.Router();
 const platformWebhookLogRepo = require("../db/repositories/platformWebhookLogRepo");
 const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
+const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
+const { processInvoiceJob } = require("../services/invoiceJobProcessor");
 const draftMappingStore = require("../services/draftMappingStore");
 const ghlService = require("../services/ghlService");
 const ghlWritebackStore = require("../services/ghlWritebackStore");
 const { validateCreateDraftInput } = require("../utils/validators");
+
+function getNextRetryAt(attemptCount) {
+  const retryDelaysInMinutes = [5, 15, 60, 180, 720];
+  const index = Math.min(Math.max(attemptCount, 0), retryDelaysInMinutes.length - 1);
+  const delayMinutes = retryDelaysInMinutes[index];
+
+  return new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+}
 
 router.post("/platform", async (req, res) => {
   try {
@@ -94,27 +104,79 @@ router.post("/platform", async (req, res) => {
       });
     }
 
-    const result = await invoiceOrchestrator.createInvoiceFromPlatformPayload(body);
+    let job = await invoiceJobRepo.getByLocationAndFellowInvoiceId(locationId, invoiceId);
 
-    await spirisInvoiceMappingRepo.createMapping({
-      locationId,
-      fellowInvoiceId: invoiceId,
-      spirisInvoiceId: result.invoice.Id,
-      spirisCustomerId: result.customer.Id,
-      sourceEventType: eventType,
-      request: result.payload,
-      response: result.invoice
-    });
+    if (!job) {
+      job = await invoiceJobRepo.createJob({
+        locationId,
+        fellowInvoiceId: invoiceId,
+        sourceEventType: eventType,
+        payload: body,
+        status: "pending"
+      });
+    }
 
-    return res.status(200).json({
-      ok: true,
-      received: true,
-      reused: false,
-      eventType,
-      locationId,
-      fellowInvoiceId: invoiceId,
-      spirisInvoiceId: result.invoice.Id
-    });
+    if (job.status === "completed") {
+      return res.status(200).json({
+        ok: true,
+        received: true,
+        reused: true,
+        eventType,
+        locationId,
+        fellowInvoiceId: invoiceId,
+        jobStatus: job.status
+      });
+    }
+
+    if (job.status === "processing") {
+      return res.status(202).json({
+        ok: true,
+        received: true,
+        queued: true,
+        eventType,
+        locationId,
+        fellowInvoiceId: invoiceId,
+        jobStatus: job.status
+      });
+    }
+
+    const result = await processInvoiceJob(job);
+
+if (result.status === "completed") {
+  return res.status(200).json({
+    ok: true,
+    received: true,
+    reused: false,
+    eventType,
+    locationId,
+    fellowInvoiceId: invoiceId,
+    spirisInvoiceId: result.spirisInvoiceId,
+    jobStatus: "completed"
+  });
+}
+
+if (result.status === "retry") {
+  return res.status(502).json({
+    ok: false,
+    error: result.error,
+    nextRetryAt: result.nextRetryAt
+  });
+}
+
+if (result.status === "failed") {
+  return res.status(502).json({
+    ok: false,
+    error: result.error,
+    reason: "max-attempts-reached"
+  });
+}
+
+return res.status(202).json({
+  ok: true,
+  received: true,
+  jobStatus: "processing"
+});
+
   } catch (err) {
     console.error("[platform-webhook] error:", err.response?.data || err.message);
 

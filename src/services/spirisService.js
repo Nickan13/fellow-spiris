@@ -117,9 +117,25 @@ async function createInvoice(accessToken, payload) {
   return response.data;
 }
 
+async function getCustomersPage(accessToken, page = 1, pageSize = 50) {
+  const response = await axios.get(
+    `${env.spirisApiBase}/v2/customers`,
+    {
+      headers: getAuthHeaders(accessToken),
+      params: {
+        $page: page,
+        $pagesize: pageSize
+      }
+    }
+  );
+
+  return response.data;
+}
+
 module.exports = {
   getCompanySettings,
   getArticlesPage,
+  getCustomersPage,
   findArticleByNumber,
   findCustomerByOrgNumber,
   findCustomerByEmail,

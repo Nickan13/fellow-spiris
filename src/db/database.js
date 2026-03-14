@@ -147,6 +147,53 @@ db.serialize(() => {
     CREATE INDEX IF NOT EXISTS idx_spiris_invoice_mappings_location_spiris_invoice
     ON spiris_invoice_mappings(location_id, spiris_invoice_id)
   `);
+
+    db.run(`
+    CREATE TABLE IF NOT EXISTS integration_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      spiris_invoice_mode TEXT NOT NULL DEFAULT 'booked',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(location_id)
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_integration_settings_location
+    ON integration_settings(location_id)
+  `);
+
+    db.run(`
+    CREATE TABLE IF NOT EXISTS invoice_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      fellow_invoice_id TEXT NOT NULL,
+      source_event_type TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      payload_json TEXT NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 5,
+      next_retry_at TEXT,
+      last_error_text TEXT,
+      locked_at TEXT,
+      processed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(location_id, fellow_invoice_id)
+    )
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_invoice_jobs_status_next_retry
+    ON invoice_jobs(status, next_retry_at)
+  `);
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_invoice_jobs_location_invoice
+    ON invoice_jobs(location_id, fellow_invoice_id)
+  `);
+
 });
 
 module.exports = db;
