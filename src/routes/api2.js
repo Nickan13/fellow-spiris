@@ -263,4 +263,32 @@ router.get("/integration/status/:locationId", async (req, res) => {
   }
 });
 
+router.get("/integration/connect-spiris/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const redirectUrl =
+      "https://integrations.fellow.se/oauth/spiris/start?locationId=" +
+      encodeURIComponent(locationId);
+
+    return res.redirect(redirectUrl);
+
+  } catch (err) {
+    console.error("connect spiris error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to start Spiris connection",
+      details: err.message
+    });
+  }
+});
+
 module.exports = router;
