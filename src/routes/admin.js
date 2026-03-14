@@ -1,9 +1,9 @@
+const customerImportService = require("../services/customerImportService");
 const express = require("express");
 const router = express.Router();
 const tokenService = require("../services/tokenService");
 const articleSyncService = require("../services/articleSyncService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
-const customerImportService = require("../services/customerImportService");
 
 router.get("/spiris/company-settings", async (req, res) => {
   try {
