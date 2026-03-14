@@ -430,6 +430,7 @@ select {
     </p>
     <div class="actions-row">
       <button id="connectBtn">Koppla till Spiris</button>
+      <button class="secondary" id="disconnectBtn" style="display:none;">Koppla bort Spiris</button>
     </div>
     <p class="help-text" id="connectHelpText">
       När kopplingen är klar uppdateras sidan automatiskt.
@@ -501,18 +502,17 @@ function formatInvoiceMode(mode) {
 }
 
 function updateConnectButton(isConnected) {
-  const btn = document.getElementById("connectBtn");
+  const connectBtn = document.getElementById("connectBtn");
+  const disconnectBtn = document.getElementById("disconnectBtn");
   const help = document.getElementById("connectHelpText");
 
   if (isConnected) {
-    btn.textContent = "Spiris anslutet";
-    btn.disabled = true;
-    btn.classList.add("disabled");
-    help.textContent = "Spiris är redan anslutet för denna location.";
+    connectBtn.style.display = "none";
+    disconnectBtn.style.display = "inline-block";
+    help.textContent = "Spiris är anslutet för denna location. Om du vill byta konto kan du först koppla bort integrationen.";
   } else {
-    btn.textContent = "Koppla till Spiris";
-    btn.disabled = false;
-    btn.classList.remove("disabled");
+    connectBtn.style.display = "inline-block";
+    disconnectBtn.style.display = "none";
     help.textContent = "När kopplingen är klar uppdateras sidan automatiskt.";
   }
 }
@@ -591,6 +591,31 @@ document.getElementById("connectBtn").onclick = function () {
 
   if (!connectPopup) {
     setError("Popup blockerad. Tillåt popup-fönster och försök igen.");
+  }
+};
+
+document.getElementById("disconnectBtn").onclick = async function () {
+  try {
+    setMessage("Kopplar bort Spiris...");
+    setError("");
+
+    const res = await fetch(
+      "/api2/integration/disconnect-spiris/" + encodeURIComponent(locationId),
+      {
+        method: "POST"
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Failed to disconnect Spiris");
+    }
+
+    setMessage("Spiris har kopplats bort.");
+    await loadStatus();
+  } catch (err) {
+    setError(err.message || "Failed to disconnect Spiris");
   }
 };
 
