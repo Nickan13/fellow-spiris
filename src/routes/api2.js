@@ -187,4 +187,45 @@ router.post("/settings/:locationId/invoice-mode", express.json(), async (req, re
   }
 });
 
+router.get("/integration/status/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    // 1. Check if Marketplace app token exists
+    const token = await platformAppTokenRepo.getByLocationId(locationId);
+
+    const appInstalled = !!token;
+
+    // 2. Read integration settings
+    const settings = await integrationSettingsRepo.getByLocationId(locationId);
+
+    const spirisInvoiceMode = settings?.spirisInvoiceMode || "booked";
+
+    return res.json({
+      ok: true,
+      status: {
+        locationId,
+        appInstalled,
+        spirisInvoiceMode
+      }
+    });
+
+  } catch (err) {
+    console.error("integration status error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch integration status",
+      details: err.message
+    });
+  }
+});
+
 module.exports = router;
