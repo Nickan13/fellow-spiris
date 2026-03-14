@@ -5,6 +5,7 @@ const router = express.Router();
 const env = require("../config/env");
 const platformAppTokenRepo = require("../db/repositories/platformAppTokenRepo");
 const integrationSettingsRepo = require("../db/repositories/integrationSettingsRepo");
+const spirisCustomerMappingRepo = require("../db/repositories/spirisCustomerMappingRepo");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -208,12 +209,16 @@ router.get("/integration/status/:locationId", async (req, res) => {
 
     const spirisInvoiceMode = settings?.spirisInvoiceMode || "booked";
 
+    const customerMappingsCount =
+      await spirisCustomerMappingRepo.countByLocationId(locationId);
+
     return res.json({
       ok: true,
       status: {
         locationId,
         appInstalled,
-        spirisInvoiceMode
+        spirisInvoiceMode,
+        customerMappingsCount
       }
     });
 
