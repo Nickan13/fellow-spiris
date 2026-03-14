@@ -664,4 +664,37 @@ loadStatus().catch((err) => {
   }
 });
 
+router.post("/integration/disconnect-spiris/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const response = await axios.delete(
+      "https://integrations.fellow.se/spiris/token?locationId=" +
+      encodeURIComponent(locationId)
+    );
+
+    return res.json({
+      ok: true,
+      message: "Spiris disconnected",
+      locationId,
+      upstream: response.data
+    });
+  } catch (err) {
+    console.error("disconnect spiris error:", err.response?.data || err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to disconnect Spiris",
+      details: err.response?.data || err.message
+    });
+  }
+});
+
 module.exports = router;
