@@ -240,6 +240,34 @@ async function getNextRunnableJob() {
   return mapRow(row);
 }
 
+async function countRetryJobsByLocationId(locationId) {
+  const row = await get(
+    `
+    SELECT COUNT(*) AS count
+    FROM invoice_jobs
+    WHERE location_id = ?
+    AND status = 'retry'
+    `,
+    [locationId]
+  );
+
+  return row ? row.count : 0;
+}
+
+async function countFailedJobsByLocationId(locationId) {
+  const row = await get(
+    `
+    SELECT COUNT(*) AS count
+    FROM invoice_jobs
+    WHERE location_id = ?
+    AND status = 'failed'
+    `,
+    [locationId]
+  );
+
+  return row ? row.count : 0;
+}
+
 module.exports = {
   getByLocationAndFellowInvoiceId,
   getNextRunnableJob,
@@ -247,5 +275,7 @@ module.exports = {
   markAsProcessing,
   markAsCompleted,
   markAsRetry,
-  markAsFailed
+  markAsFailed,
+  countRetryJobsByLocationId,
+  countFailedJobsByLocationId
 };
