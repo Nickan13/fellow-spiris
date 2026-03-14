@@ -387,6 +387,12 @@ button.secondary {
   background: #8597b3;
 }
 
+button.disabled {
+  background: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
 select {
   padding: 10px 12px;
   font-size: 14px;
@@ -420,11 +426,14 @@ select {
   <div class="section">
     <h3>Koppla till Spiris</h3>
     <p class="help-text">
-      Koppla ditt Spiris-konto till Fellow så att integrationen kan hämta kunder, artiklar och skicka fakturor.
+      Koppla ditt Spiris-konto till Fellow så att integrationen kan hämta kunder, synka produkter och skicka fakturor.
     </p>
     <div class="actions-row">
       <button id="connectBtn">Koppla till Spiris</button>
     </div>
+    <p class="help-text" id="connectHelpText">
+      När kopplingen är klar uppdateras sidan automatiskt.
+    </p>
   </div>
 
   <div class="section">
@@ -435,6 +444,9 @@ select {
     <div class="actions-row">
       <button class="secondary" id="importCustomersBtn">Importera kunder</button>
     </div>
+    <p class="help-text">
+      Funktionen hämtar kunder från Spiris och kopplar dem till rätt kontakter i Fellow.
+    </p>
   </div>
 
   <div class="section">
@@ -454,6 +466,16 @@ select {
     </p>
   </div>
 
+  <div class="section">
+    <h3>Produktsynk</h3>
+    <p class="help-text">
+      Produkter och artiklar synkas automatiskt från Spiris i bakgrunden. Du behöver normalt inte starta någon manuell synk här.
+    </p>
+    <p class="help-text">
+      Nästa steg senare blir att visa senaste artikelsync och eventuella produkter som saknar mapping.
+    </p>
+  </div>
+
   <div class="notice" id="message"></div>
   <div class="error" id="error"></div>
 
@@ -462,6 +484,7 @@ select {
 <script>
 const params = new URLSearchParams(window.location.search);
 const locationId = params.get("locationId");
+let connectPopup = null;
 
 function setMessage(text) {
   document.getElementById("message").textContent = text || "";
@@ -472,15 +495,26 @@ function setError(text) {
 }
 
 function formatInvoiceMode(mode) {
-  if (mode === "draft") {
-    return "utkast";
-  }
-
-  if (mode === "booked") {
-    return "bokför direkt";
-  }
-
+  if (mode === "draft") return "utkast";
+  if (mode === "booked") return "bokför direkt";
   return mode || "";
+}
+
+function updateConnectButton(isConnected) {
+  const btn = document.getElementById("connectBtn");
+  const help = document.getElementById("connectHelpText");
+
+  if (isConnected) {
+    btn.textContent = "Spiris anslutet";
+    btn.disabled = true;
+    btn.classList.add("disabled");
+    help.textContent = "Spiris är redan anslutet för denna location.";
+  } else {
+    btn.textContent = "Koppla till Spiris";
+    btn.disabled = false;
+    btn.classList.remove("disabled");
+    help.textContent = "När kopplingen är klar uppdateras sidan automatiskt.";
+  }
 }
 
 async function loadStatus() {
@@ -508,11 +542,56 @@ async function loadStatus() {
   \`;
 
   document.getElementById("invoiceModeSelect").value = s.spirisInvoiceMode;
+  updateConnectButton(s.spirisConnected);
 }
 
+window.addEventListener("message", async function (event) {
+  if (event.origin !== "https://integrations.fellow.se") {
+    return;
+  }
+
+  if (!event.data || event.data.type !== "spiris-oauth-success") {
+    return;
+  }
+
+  if (event.data.locationId && event.data.locationId !== locationId) {
+    return;
+  }
+
+  setMessage("Spiris kopplades klart. Uppdaterar status...");
+  setError("");
+
+  if (connectPopup && !connectPopup.closed) {
+    try {
+      connectPopup.close();
+    } catch (err) {}
+  }
+
+  try {
+    await loadStatus();
+    setMessage("Spiris är nu anslutet.");
+  } catch (err) {
+    setError(err.message || "Failed to refresh status after Spiris connection");
+  }
+});
+
 document.getElementById("connectBtn").onclick = function () {
-  window.top.location.href =
-    "/api2/integration/connect-spiris/" + encodeURIComponent(locationId);
+  if (document.getElementById("connectBtn").disabled) {
+    return;
+  }
+
+  setMessage("Öppnar Spiris-inloggning...");
+  setError("");
+
+  connectPopup = window.open(
+    "/api2/integration/connect-spiris/" + encodeURIComponent(locationId),
+    "spirisConnectPopup",
+    "width=700,height=800,resizable=yes,scrollbars=yes"
+  );
+
+  if (!connectPopup) {
+    setError("Popup blockerad. Tillåt popup-fönster och försök igen.");
+  }
 };
 
 document.getElementById("importCustomersBtn").onclick = async function () {
