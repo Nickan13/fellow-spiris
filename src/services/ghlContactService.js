@@ -92,8 +92,78 @@ async function createContact(locationId, input) {
   };
 }
 
+async function createBusiness(locationId, input) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const headers = await getHeadersForLocation(locationId);
+
+  const payload = {
+    locationId,
+    name: input.name || "",
+    phone: input.phone || "",
+    email: input.email || "",
+    address: input.address1 || "",
+    city: input.city || "",
+    postalCode: input.postalCode || "",
+    country: input.country || "SE"
+  };
+
+  const response = await axios.post(
+    `${env.ghlApiBase}/businesses/`,
+    payload,
+    {
+      headers
+    }
+  );
+
+  return {
+    request: payload,
+    response: response.data,
+    business: response.data?.business || response.data || null
+  };
+}
+
+async function attachContactToBusiness(locationId, contactId, businessId) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  if (!contactId) {
+    throw new Error("contactId is required");
+  }
+
+  if (!businessId) {
+    throw new Error("businessId is required");
+  }
+
+  const headers = await getHeadersForLocation(locationId);
+
+  const payload = {
+    locationId,
+    contactIds: [contactId],
+    businessId
+  };
+
+  const response = await axios.post(
+    `${env.ghlApiBase}/contacts/bulk/business`,
+    payload,
+    {
+      headers
+    }
+  );
+
+  return {
+    request: payload,
+    response: response.data
+  };
+}
+
 module.exports = {
   getHeadersForLocation,
   findContactByEmail,
-  createContact
+  createContact,
+  createBusiness,
+  attachContactToBusiness
 };
