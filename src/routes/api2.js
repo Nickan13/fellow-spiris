@@ -1049,4 +1049,52 @@ router.get("/integration/fellow/products/:locationId", async (req, res) => {
   }
 });
 
+router.post("/integration/fellow/test-create-product/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const articles = await articleStore.listArticlesByLocation(locationId, 1);
+
+    if (!articles || articles.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        error: "No synced Spiris articles found"
+      });
+    }
+
+    const article = articles[0];
+
+    const result = await ghlProductService.createProduct(locationId, {
+      name: article.name || article.articleNumber,
+      description: `Spiris article ${article.articleNumber}`
+    });
+
+    return res.json({
+      ok: true,
+      locationId,
+      spirisArticleNumber: article.articleNumber,
+      createdProduct: result.product
+    });
+
+  } catch (err) {
+    console.error(
+      "test create product error:",
+      err.response?.data || err.message
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to create Fellow product",
+      details: err.response?.data || err.message
+    });
+  }
+});
+
 module.exports = router;
