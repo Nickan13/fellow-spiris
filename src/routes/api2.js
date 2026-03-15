@@ -568,6 +568,7 @@ select option {
     <div class="notice" id="message"></div>
     <div class="error" id="error"></div>
     <div id="importDetails"></div>
+    <div id="requiresActionDetails"></div>
   </div>
 
 </div>
@@ -587,6 +588,10 @@ function setError(text) {
 
 function setImportDetails(html) {
   document.getElementById("importDetails").innerHTML = html || "";
+}
+
+function setRequiresActionDetails(html) {
+  document.getElementById("requiresActionDetails").innerHTML = html || "";
 }
 
 function formatInvoiceMode(mode) {
@@ -645,6 +650,45 @@ async function loadStatus() {
   updateConnectButton(s.spirisConnected);
 }
 
+async function loadRequiresActionJobs() {
+  const res = await fetch(
+    "/api2/integration/requires-action/" + encodeURIComponent(locationId)
+  );
+
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || "Failed to load requires-action jobs");
+  }
+
+  if (!data.jobs || data.jobs.length === 0) {
+    setRequiresActionDetails(
+      '<div class="import-details-card">' +
+      '<h4>Fakturor som kräver åtgärd</h4>' +
+      '<div>Inga fakturor kräver åtgärd just nu.</div>' +
+      '</div>'
+    );
+    return;
+  }
+
+  const items = data.jobs.map(function (job) {
+    const label = job.fellowInvoiceId || "Okänd faktura";
+    const reason = job.lastErrorText || "Okänd orsak";
+
+    return (
+      "<li><b>Faktura:</b> " + label +
+      "<br/><b>Problem:</b> " + reason + "</li>"
+    );
+  }).join("");
+
+  setRequiresActionDetails(
+    '<div class="import-details-card">' +
+    '<h4>Fakturor som kräver åtgärd</h4>' +
+    '<ul>' + items + '</ul>' +
+    '</div>'
+  );
+}
+
 window.addEventListener("message", async function (event) {
   if (event.origin !== "https://integrations.fellow.se") {
     return;
@@ -669,6 +713,7 @@ window.addEventListener("message", async function (event) {
 
   try {
     await loadStatus();
+    await loadRequiresActionJobs();
     setMessage("Spiris är nu anslutet.");
   } catch (err) {
     setError(err.message || "Failed to refresh status after Spiris connection");
@@ -768,6 +813,7 @@ document.getElementById("importCustomersBtn").onclick = async function () {
     }
 
     await loadStatus();
+    await loadRequiresActionJobs();
 
     setMessage(
       "Import klar. Behandlade: " + importedCount +
@@ -824,6 +870,7 @@ document.getElementById("saveInvoiceModeBtn").onclick = async function () {
     }
 
     await loadStatus();
+    await loadRequiresActionJobs();
     setMessage("Fakturaläget har sparats som: " + formatInvoiceMode(selectedMode));
   } catch (err) {
     setError(err.message || "Failed to update invoice mode");
@@ -834,9 +881,13 @@ document.getElementById("saveInvoiceModeBtn").onclick = async function () {
   }
 };
 
-loadStatus().catch((err) => {
-  setError(err.message || "Failed to load integration status");
+Promise.all([
+  loadStatus(),
+  loadRequiresActionJobs()
+]).catch((err) => {
+  setError(err.message || "Failed to load page data");
 });
+
 </script>
 
 </body>
