@@ -641,7 +641,7 @@ document.getElementById("disconnectBtn").onclick = async function () {
 
 document.getElementById("importCustomersBtn").onclick = async function () {
   try {
-    setMessage("Importerar kunder...");
+    setMessage("Importerar 10 kunder...");
     setError("");
 
     const res = await fetch("/api2/admin/spiris/customers/import-all", {
@@ -649,7 +649,11 @@ document.getElementById("importCustomersBtn").onclick = async function () {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ locationId })
+      body: JSON.stringify({
+        locationId,
+        pageSize: 10,
+        maxPages: 1
+      })
     });
 
     const rawText = await res.text();
@@ -666,8 +670,21 @@ document.getElementById("importCustomersBtn").onclick = async function () {
       throw new Error(data.error || data.details || "Customer import failed");
     }
 
-    setMessage("Kundimport klar.");
+    const importedCount = data.totals?.total || 0;
+    const createdCount = data.totals?.created || 0;
+    const matchedCount = data.totals?.matched || 0;
+    const mappedCount = data.totals?.mapped || 0;
+    const failedCount = data.totals?.failed || 0;
+
     await loadStatus();
+
+    setMessage(
+      "Import klar. Behandlade: " + importedCount +
+      ", skapade: " + createdCount +
+      ", matchade: " + matchedCount +
+      ", redan mappade: " + mappedCount +
+      ", fel: " + failedCount + "."
+    );
   } catch (err) {
     setError(err.message || "Customer import failed");
   }
