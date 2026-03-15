@@ -41,7 +41,37 @@ async function listProducts(locationId) {
   return response.data;
 }
 
+async function createProduct(locationId, input) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const headers = await getHeadersForLocation(locationId);
+
+  const payload = {
+    locationId,
+    name: input.name || "",
+    description: input.description || "",
+    availableInStore: true
+  };
+
+  const response = await axios.post(
+    `${env.ghlApiBase}/products/`,
+    payload,
+    {
+      headers
+    }
+  );
+
+  return {
+    request: payload,
+    response: response.data,
+    product: response.data?.product || response.data || null
+  };
+}
+
 module.exports = {
   getHeadersForLocation,
-  listProducts
+  listProducts,
+  createProduct
 };
