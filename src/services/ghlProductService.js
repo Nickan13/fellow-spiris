@@ -1,0 +1,47 @@
+const axios = require("axios");
+const env = require("../config/env");
+const platformAppTokenRepo = require("../db/repositories/platformAppTokenRepo");
+
+async function getHeadersForLocation(locationId) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const token = await platformAppTokenRepo.getTokenByLocationId(locationId);
+
+  if (!token?.accessToken) {
+    throw new Error(`No app token found for locationId=${locationId}`);
+  }
+
+  return {
+    Authorization: `Bearer ${token.accessToken}`,
+    Version: env.ghlApiVersion,
+    Accept: "application/json",
+    "Content-Type": "application/json"
+  };
+}
+
+async function listProducts(locationId) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const headers = await getHeadersForLocation(locationId);
+
+  const response = await axios.get(
+    `${env.ghlApiBase}/products/`,
+    {
+      headers,
+      params: {
+        locationId
+      }
+    }
+  );
+
+  return response.data;
+}
+
+module.exports = {
+  getHeadersForLocation,
+  listProducts
+};
