@@ -87,7 +87,7 @@ async function createPrice(locationId, productId, input) {
     name: input.name || "Standardpris",
     type: "one_time",
     currency: input.currency || "SEK",
-    amount: String(input.amount ?? "0")
+    amount: Number(input.amount ?? "0")
   };
 
   const response = await axios.post(
