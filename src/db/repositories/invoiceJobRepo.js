@@ -287,6 +287,20 @@ async function countFailedJobsByLocationId(locationId) {
   return row ? row.count : 0;
 }
 
+async function countRequiresActionJobsByLocationId(locationId) {
+  const row = await get(
+    `
+    SELECT COUNT(*) AS count
+    FROM invoice_jobs
+    WHERE location_id = ?
+    AND status = 'requires_action'
+    `,
+    [locationId]
+  );
+
+  return row ? row.count : 0;
+}
+
 module.exports = {
   getByLocationAndFellowInvoiceId,
   getNextRunnableJob,
@@ -297,5 +311,6 @@ module.exports = {
   markAsFailed,
   markAsRequiresAction,
   countRetryJobsByLocationId,
-  countFailedJobsByLocationId
+  countFailedJobsByLocationId,
+  countRequiresActionJobsByLocationId
 };

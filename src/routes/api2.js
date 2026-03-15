@@ -219,6 +219,9 @@ router.get("/integration/status/:locationId", async (req, res) => {
     const retryJobsCount =
       await invoiceJobRepo.countRetryJobsByLocationId(locationId);
 
+    const requiresActionCount =
+      await invoiceJobRepo.countRequiresActionJobsByLocationId(locationId);
+
     const failedJobsCount =
       await invoiceJobRepo.countFailedJobsByLocationId(locationId);
 
@@ -248,6 +251,7 @@ router.get("/integration/status/:locationId", async (req, res) => {
         productMappingsCount,
         invoiceMappingsCount,
         retryJobsCount,
+        requiresActionCount,
         failedJobsCount
       }
     });
@@ -633,6 +637,7 @@ async function loadStatus() {
     <div class="status"><b>Synkade produkter:</b> \${s.productMappingsCount}</div>
     <div class="status"><b>Skickade fakturor:</b> \${s.invoiceMappingsCount}</div>
     <div class="status"><b>Retry-jobb:</b> \${s.retryJobsCount}</div>
+    <div class="status"><b>Kräver åtgärd:</b> ${s.requiresActionCount}</div>
     <div class="status"><b>Misslyckade jobb:</b> \${s.failedJobsCount}</div>
   \`;
 
