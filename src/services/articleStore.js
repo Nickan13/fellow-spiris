@@ -105,7 +105,56 @@ async function getArticleByNumber(locationId, articleNumber) {
   };
 }
 
+async function listArticlesByLocation(locationId, limit = 500) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  const rows = await new Promise((resolve, reject) => {
+    db.all(
+      `
+        SELECT
+          id,
+          location_id,
+          spiris_article_id,
+          article_number,
+          name,
+          unit_price,
+          raw_json,
+          changed_utc,
+          last_synced_at,
+          created_at,
+          updated_at
+        FROM spiris_articles
+        WHERE location_id = ?
+        ORDER BY article_number ASC
+        LIMIT ?
+      `,
+      [locationId, Number(limit)],
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    locationId: row.location_id,
+    spirisArticleId: row.spiris_article_id,
+    articleNumber: row.article_number,
+    name: row.name,
+    unitPrice: row.unit_price,
+    raw: JSON.parse(row.raw_json),
+    changedUtc: row.changed_utc,
+    lastSyncedAt: row.last_synced_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }));
+}
+
 module.exports = {
   upsertArticle,
-  getArticleByNumber
+  getArticleByNumber,
+  listArticlesByLocation
 };
