@@ -642,7 +642,7 @@ async function loadStatus() {
     <div class="status"><b>Synkade produkter:</b> \${s.productMappingsCount}</div>
     <div class="status"><b>Skickade fakturor:</b> \${s.invoiceMappingsCount}</div>
     <div class="status"><b>Retry-jobb:</b> \${s.retryJobsCount}</div>
-    <div class="status"><b>Kräver åtgärd:</b> ${s.requiresActionCount}</div>
+    <div class="status"><b>Kräver åtgärd:</b> \${s.requiresActionCount}</div>
     <div class="status"><b>Misslyckade jobb:</b> \${s.failedJobsCount}</div>
   \`;
 
