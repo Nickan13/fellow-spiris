@@ -10,6 +10,7 @@ const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
 const tokenService = require("../services/tokenService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
 const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
+const articleStore = require("../services/articleStore");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -980,6 +981,37 @@ router.get("/integration/requires-action/:locationId", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "Failed to fetch requires-action jobs",
+      details: err.message
+    });
+  }
+});
+
+router.get("/integration/spiris/articles/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const limit = Number(req.query.limit || 200);
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const articles = await articleStore.listArticlesByLocation(locationId, limit);
+
+    return res.json({
+      ok: true,
+      locationId,
+      count: articles.length,
+      articles
+    });
+  } catch (err) {
+    console.error("spiris articles list error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch synced Spiris articles",
       details: err.message
     });
   }
