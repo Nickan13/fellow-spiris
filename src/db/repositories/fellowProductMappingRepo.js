@@ -91,6 +91,38 @@ async function getMappingByProductId(locationId, fellowProductId) {
   };
 }
 
+async function getMappingBySpirisArticleNumber(locationId, spirisArticleNumber) {
+  const row = await get(
+    `
+      SELECT
+        id,
+        location_id,
+        fellow_product_id,
+        spiris_article_number,
+        created_at,
+        updated_at
+      FROM fellow_product_mappings
+      WHERE location_id = ?
+        AND spiris_article_number = ?
+      LIMIT 1
+    `,
+    [locationId, spirisArticleNumber]
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    locationId: row.location_id,
+    fellowProductId: row.fellow_product_id,
+    spirisArticleNumber: row.spiris_article_number,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 async function listMappingsByLocation(locationId) {
   const rows = await all(
     `
@@ -134,6 +166,7 @@ async function countByLocationId(locationId) {
 module.exports = {
   upsertMapping,
   getMappingByProductId,
+  getMappingBySpirisArticleNumber,
   listMappingsByLocation,
   countByLocationId
 };
