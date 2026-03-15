@@ -10,6 +10,15 @@ function getNextRetryAt(attemptCount) {
   return new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
 }
 
+function isRequiresActionError(err) {
+  const message = String(err?.message || "");
+
+  return (
+    message.includes("No product mapping found") ||
+    message.includes("No synced Spiris article found")
+  );
+}
+
 async function processInvoiceJob(job) {
   if (!job) {
     return { processed: false, reason: "no-job" };
@@ -58,7 +67,20 @@ async function processInvoiceJob(job) {
       fellowInvoiceId: job.fellowInvoiceId,
       spirisInvoiceId: result.invoice.Id
     };
-  } catch (err) {
+    } catch (err) {
+    if (isRequiresActionError(err)) {
+      await invoiceJobRepo.markAsRequiresAction(job.id, err.message);
+
+      return {
+        processed: true,
+        status: "requires_action",
+        reason: "user-action-required",
+        locationId: job.locationId,
+        fellowInvoiceId: job.fellowInvoiceId,
+        error: err.message
+      };
+    }
+
     const refreshedJob = await invoiceJobRepo.getByLocationAndFellowInvoiceId(
       job.locationId,
       job.fellowInvoiceId
@@ -95,7 +117,6 @@ async function processInvoiceJob(job) {
       nextRetryAt
     };
   }
-}
 
 module.exports = {
   processInvoiceJob
