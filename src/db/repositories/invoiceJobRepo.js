@@ -301,6 +301,31 @@ async function countRequiresActionJobsByLocationId(locationId) {
   return row ? row.count : 0;
 }
 
+async function listRequiresActionJobsByLocationId(locationId) {
+  const rows = await all(
+    `
+    SELECT
+      id,
+      location_id,
+      fellow_invoice_id,
+      source_event_type,
+      status,
+      payload_json,
+      attempt_count,
+      last_error_text,
+      created_at,
+      updated_at
+    FROM invoice_jobs
+    WHERE location_id = ?
+      AND status = 'requires_action'
+    ORDER BY created_at DESC
+    `,
+    [locationId]
+  );
+
+  return rows.map(mapRow);
+}
+
 module.exports = {
   getByLocationAndFellowInvoiceId,
   getNextRunnableJob,
@@ -312,5 +337,6 @@ module.exports = {
   markAsRequiresAction,
   countRetryJobsByLocationId,
   countFailedJobsByLocationId,
-  countRequiresActionJobsByLocationId
+  countRequiresActionJobsByLocationId,
+  listRequiresActionJobsByLocationId
 };

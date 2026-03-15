@@ -881,4 +881,36 @@ router.post("/integration/disconnect-spiris/:locationId", async (req, res) => {
   }
 });
 
+router.get("/integration/requires-action/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const jobs =
+      await invoiceJobRepo.listRequiresActionJobsByLocationId(locationId);
+
+    return res.json({
+      ok: true,
+      locationId,
+      count: jobs.length,
+      jobs
+    });
+
+  } catch (err) {
+    console.error("requires-action jobs error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch requires-action jobs",
+      details: err.message
+    });
+  }
+});
+
 module.exports = router;
