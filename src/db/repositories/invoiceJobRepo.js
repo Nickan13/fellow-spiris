@@ -202,6 +202,25 @@ async function markAsFailed(id, errorText) {
   );
 }
 
+async function markAsRequiresAction(id, errorText) {
+  const now = toIsoNow();
+
+  await run(
+    `
+      UPDATE invoice_jobs
+      SET
+        status = 'requires_action',
+        attempt_count = attempt_count + 1,
+        locked_at = NULL,
+        last_error_text = ?,
+        next_retry_at = NULL,
+        updated_at = ?
+      WHERE id = ?
+    `,
+    [errorText || null, now, id]
+  );
+}
+
 async function getNextRunnableJob() {
   const now = toIsoNow();
 
@@ -276,6 +295,7 @@ module.exports = {
   markAsCompleted,
   markAsRetry,
   markAsFailed,
+  markAsRequiresAction,
   countRetryJobsByLocationId,
   countFailedJobsByLocationId
 };
