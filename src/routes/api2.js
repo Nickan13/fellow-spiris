@@ -11,6 +11,7 @@ const tokenService = require("../services/tokenService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
 const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
 const articleStore = require("../services/articleStore");
+const ghlProductService = require("../services/ghlProductService");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -1015,6 +1016,35 @@ router.get("/integration/spiris/articles/:locationId", async (req, res) => {
       ok: false,
       error: "Failed to fetch synced Spiris articles",
       details: err.message
+    });
+  }
+});
+
+router.get("/integration/fellow/products/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const data = await ghlProductService.listProducts(locationId);
+
+    return res.json({
+      ok: true,
+      locationId,
+      data
+    });
+  } catch (err) {
+    console.error("fellow products list error:", err.response?.data || err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch Fellow products",
+      details: err.response?.data || err.message
     });
   }
 });
