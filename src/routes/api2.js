@@ -1205,11 +1205,13 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
       });
     }
 
-    const articles = await articleStore.listArticlesByLocation(locationId, limit);
+    const articles = await articleStore.listArticlesByLocation(locationId, 1000);
 
-    const activeArticles = (articles || []).filter((article) => {
-      return article?.raw?.IsActive === true;
-    });
+    const activeArticles = (articles || [])
+      .filter((article) => {
+        return article?.raw?.IsActive === true;
+      })
+      .slice(0, limit);
 
     if (activeArticles.length === 0) {
       return res.json({
