@@ -1061,8 +1061,6 @@ router.get("/integration/requires-action/:locationId", async (req, res) => {
   }
 });
 
-//testar lägga in lite text här bara.
-
 router.get("/integration/spiris/articles/:locationId", async (req, res) => {
   try {
     const { locationId } = req.params;
@@ -1209,7 +1207,11 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
 
     const articles = await articleStore.listArticlesByLocation(locationId, limit);
 
-    if (!articles || articles.length === 0) {
+    const activeArticles = (articles || []).filter((article) => {
+      return article?.raw?.IsActive === true;
+    });
+
+    if (activeArticles.length === 0) {
       return res.json({
         ok: true,
         locationId,
@@ -1226,7 +1228,7 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
     let skippedAlreadyMapped = 0;
     let failed = 0;
 
-    for (const article of articles) {
+    for (const article of activeArticles) {
       const spirisArticleNumber = article.articleNumber || null;
       const articleName = article.name || spirisArticleNumber || "Unnamed article";
 
@@ -1311,7 +1313,7 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
     return res.json({
       ok: true,
       locationId,
-      total: articles.length,
+      total: activeArticles.length,
       created,
       skippedAlreadyMapped,
       failed,
