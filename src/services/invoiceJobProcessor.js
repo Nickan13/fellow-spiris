@@ -117,7 +117,7 @@ async function processInvoiceJob(job) {
       nextRetryAt
     };
   }
-
+}
 module.exports = {
   processInvoiceJob
 };
