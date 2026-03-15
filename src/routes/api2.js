@@ -1071,16 +1071,37 @@ router.post("/integration/fellow/test-create-product/:locationId", async (req, r
 
     const article = articles[0];
 
-    const result = await ghlProductService.createProduct(locationId, {
+        const result = await ghlProductService.createProduct(locationId, {
       name: article.name || article.articleNumber,
-      description: `Spiris article ${article.articleNumber}`
+      description: `Spiris article ${article.articleNumber}`,
+      productType: "SERVICE"
     });
+
+    const productId =
+      result.product?._id ||
+      result.product?.id ||
+      null;
+
+    if (!productId) {
+      throw new Error("Created Fellow product missing id");
+    }
+
+    const priceResult = await ghlProductService.createPrice(
+      locationId,
+      productId,
+      {
+        name: "Standardpris",
+        currency: "SEK",
+        amount: article.unitPrice ?? 0
+      }
+    );
 
     return res.json({
       ok: true,
       locationId,
       spirisArticleNumber: article.articleNumber,
-      createdProduct: result.product
+      createdProduct: result.product,
+      createdPrice: priceResult.price
     });
 
   } catch (err) {
