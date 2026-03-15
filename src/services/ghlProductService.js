@@ -52,6 +52,7 @@ async function createProduct(locationId, input) {
     locationId,
     name: input.name || "",
     description: input.description || "",
+    productType: input.productType || "SERVICE",
     availableInStore: true
   };
 
