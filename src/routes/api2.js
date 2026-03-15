@@ -1118,4 +1118,143 @@ router.post("/integration/fellow/test-create-product/:locationId", async (req, r
   }
 });
 
+router.post("/integration/fellow/import-products/:locationId", express.json(), async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const requestedLimit = Number(req.body?.limit ?? 10);
+    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 100)
+      : 10;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const articles = await articleStore.listArticlesByLocation(locationId, limit);
+
+    if (!articles || articles.length === 0) {
+      return res.json({
+        ok: true,
+        locationId,
+        total: 0,
+        created: 0,
+        skippedAlreadyMapped: 0,
+        failed: 0,
+        results: []
+      });
+    }
+
+    const results = [];
+    let created = 0;
+    let skippedAlreadyMapped = 0;
+    let failed = 0;
+
+    for (const article of articles) {
+      const spirisArticleNumber = article.articleNumber || null;
+      const articleName = article.name || spirisArticleNumber || "Unnamed article";
+
+      if (!spirisArticleNumber) {
+        failed += 1;
+        results.push({
+          status: "failed",
+          articleName,
+          error: "Article is missing articleNumber"
+        });
+        continue;
+      }
+
+      try {
+        const existingMapping =
+          await fellowProductMappingRepo.getMappingBySpirisArticleNumber(
+            locationId,
+            spirisArticleNumber
+          );
+
+        if (existingMapping) {
+          skippedAlreadyMapped += 1;
+          results.push({
+            status: "skippedAlreadyMapped",
+            spirisArticleNumber,
+            articleName,
+            fellowProductId: existingMapping.fellowProductId
+          });
+          continue;
+        }
+
+        const productResult = await ghlProductService.createProduct(locationId, {
+          name: articleName,
+          description: `Spiris article ${spirisArticleNumber}`,
+          productType: "SERVICE"
+        });
+
+        const productId =
+          productResult.product?._id ||
+          productResult.product?.id ||
+          null;
+
+        if (!productId) {
+          throw new Error("Created Fellow product missing id");
+        }
+
+        const priceResult = await ghlProductService.createPrice(
+          locationId,
+          productId,
+          {
+            name: "Standardpris",
+            currency: "SEK",
+            amount: article.unitPrice ?? 0
+          }
+        );
+
+        await fellowProductMappingRepo.upsertMapping({
+          locationId,
+          fellowProductId: productId,
+          spirisArticleNumber
+        });
+
+        created += 1;
+        results.push({
+          status: "created",
+          spirisArticleNumber,
+          articleName,
+          fellowProductId: productId,
+          fellowPriceId: priceResult.price?._id || priceResult.price?.id || null
+        });
+      } catch (err) {
+        failed += 1;
+        results.push({
+          status: "failed",
+          spirisArticleNumber,
+          articleName,
+          error: err.response?.data || err.message
+        });
+      }
+    }
+
+    return res.json({
+      ok: true,
+      locationId,
+      total: articles.length,
+      created,
+      skippedAlreadyMapped,
+      failed,
+      results
+    });
+  } catch (err) {
+    console.error(
+      "import fellow products error:",
+      err.response?.data || err.message
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to import Spiris articles as Fellow products",
+      details: err.response?.data || err.message
+    });
+  }
+});
+
 module.exports = router;
