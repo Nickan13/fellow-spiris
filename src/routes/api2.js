@@ -555,11 +555,14 @@ select option {
   <div class="section">
     <h3>Produkter</h3>
     <p class="help-text">
-      Produkter och artiklar synkas automatiskt mellan Fellow och Spiris.
+      Importera artiklar från Spiris och skapa dem som produkter i Fellow med pris och lokal mapping.
     </p>
     <p class="help-text">
-      Här kan du se senaste synkning och om det finns något som inte är synkat.
+      Importen hoppar över artiklar som redan är mappade, så samma produkter skapas inte två gånger.
     </p>
+    <div class="actions-row">
+      <button class="secondary" id="importProductsBtn">Importera produkter</button>
+    </div>
   </div>
 
     <div class="section">
@@ -784,6 +787,77 @@ document.getElementById("disconnectBtn").onclick = async function () {
     await loadRequiresActionJobs();
   } catch (err) {
     setError(err.message || "Failed to disconnect Spiris");
+  }
+};
+
+document.getElementById("importProductsBtn").onclick = async function () {
+  try {
+    setMessage("Importerar produkter från Spiris...");
+    setError("");
+    setImportDetails("");
+
+    const button = document.getElementById("importProductsBtn");
+    button.disabled = true;
+    button.textContent = "Importerar...";
+
+    const res = await fetch(
+      "/api2/integration/fellow/import-products/" + encodeURIComponent(locationId),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          limit: 10
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || data.details || "Product import failed");
+    }
+
+    const createdCount = data.created || 0;
+    const skippedCount = data.skippedAlreadyMapped || 0;
+    const failedCount = data.failed || 0;
+    const totalCount = data.total || 0;
+
+    await loadStatus();
+    await loadRequiresActionJobs();
+
+    setMessage(
+      "Produktimport klar. Behandlade: " + totalCount +
+      ", skapade: " + createdCount +
+      ", redan mappade: " + skippedCount +
+      ", fel: " + failedCount + "."
+    );
+
+    const failedRows = (data.results || []).filter(function (row) {
+      return row.status === "failed";
+    });
+
+    if (failedRows.length > 0) {
+      const items = failedRows.map(function (row) {
+        const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
+        const reason = row.error || "Okänt fel";
+        return "<li><b>" + label + "</b>: " + reason + "</li>";
+      }).join("");
+
+      setImportDetails(
+        '<div class="import-details-card">' +
+        '<h4>Produkter med fel</h4>' +
+        '<ul>' + items + '</ul>' +
+        '</div>'
+      );
+    }
+  } catch (err) {
+    setError(err.message || "Product import failed");
+  } finally {
+    const button = document.getElementById("importProductsBtn");
+    button.disabled = false;
+    button.textContent = "Importera produkter";
   }
 };
 
