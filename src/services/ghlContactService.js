@@ -141,7 +141,7 @@ async function attachContactToBusiness(locationId, contactId, businessId) {
 
   const payload = {
     locationId,
-    contactIds: [contactId],
+    ids: [String(contactId)],
     businessId
   };
 
