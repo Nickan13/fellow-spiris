@@ -671,13 +671,26 @@ async function loadRequiresActionJobs() {
     return;
   }
 
-  const items = data.jobs.map(function (job) {
-    const label = job.fellowInvoiceId || "Okänd faktura";
+    const items = data.jobs.map(function (job) {
+    const invoiceId = job.fellowInvoiceId || "Okänd faktura";
     const reason = job.lastErrorText || "Okänd orsak";
 
+    const invoiceItems = Array.isArray(job.payload?.invoiceItems)
+      ? job.payload.invoiceItems
+      : [];
+
+    const productList = invoiceItems.length
+      ? invoiceItems.map(function (item) {
+          return item.name || item.productId || "Okänd produkt";
+        }).join(", ")
+      : "Inga produkter hittades i payload";
+
     return (
-      "<li><b>Faktura:</b> " + label +
-      "<br/><b>Problem:</b> " + reason + "</li>"
+      "<li>" +
+      "<b>Faktura:</b> " + invoiceId +
+      "<br/><b>Produkter:</b> " + productList +
+      "<br/><b>Problem:</b> " + reason +
+      "</li>"
     );
   }).join("");
 
@@ -759,6 +772,7 @@ document.getElementById("disconnectBtn").onclick = async function () {
 
     setMessage("Spiris har kopplats bort.");
     await loadStatus();
+    await loadRequiresActionJobs();
   } catch (err) {
     setError(err.message || "Failed to disconnect Spiris");
   }
