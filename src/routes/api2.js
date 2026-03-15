@@ -366,6 +366,24 @@ h2 {
   margin: 10px 0;
 }
 
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-connected {
+  background: #e6f6ec;
+  color: #0f7a39;
+}
+
+.status-disconnected {
+  background: #fdecec;
+  color: #b00020;
+}
+
 .actions-row {
   display: flex;
   gap: 10px;
@@ -383,6 +401,10 @@ button {
   cursor: pointer;
 }
 
+button:hover {
+  background: #6f2d78;
+}
+
 button.secondary {
   background: #8597b3;
 }
@@ -394,11 +416,27 @@ button.disabled {
 }
 
 select {
-  padding: 10px 12px;
+  padding: 10px 40px 10px 14px;
   font-size: 14px;
   border-radius: 6px;
-  border: 1px solid #ccc;
+  border: none;
+  background-color: #82358b;
+  color: white;
+  cursor: pointer;
+
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+}
+
+select option {
   background: white;
+  color: black;
 }
 
 .notice {
@@ -421,6 +459,33 @@ select {
   border-radius: 6px;
   padding: 12px;
   min-height: 20px;
+}
+
+#importDetails {
+  margin-top: 16px;
+}
+
+.import-details-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.import-details-card h4 {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+}
+
+.import-details-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.import-details-card li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 </style>
@@ -491,13 +556,14 @@ select {
     </p>
   </div>
 
-  <div class="section">
+    <div class="section">
     <h3>Status och meddelanden</h3>
     <p class="help-text">
       Här visas resultat från import, koppling och ändringar i fakturaläge.
     </p>
     <div class="notice" id="message"></div>
     <div class="error" id="error"></div>
+    <div id="importDetails"></div>
   </div>
 
 </div>
@@ -513,6 +579,10 @@ function setMessage(text) {
 
 function setError(text) {
   document.getElementById("error").textContent = text || "";
+}
+
+function setImportDetails(html) {
+  document.getElementById("importDetails").innerHTML = html || "";
 }
 
 function formatInvoiceMode(mode) {
@@ -540,6 +610,7 @@ function updateConnectButton(isConnected) {
 async function loadStatus() {
   setMessage("");
   setError("");
+  setImportDetails("");
 
   const res = await fetch("/api2/integration/status/" + encodeURIComponent(locationId));
   const data = await res.json();
@@ -550,9 +621,13 @@ async function loadStatus() {
 
   const s = data.status;
 
+  const spirisBadge = s.spirisConnected
+  ? '<span class="status-badge status-connected">Ansluten</span>'
+  : '<span class="status-badge status-disconnected">Ej ansluten</span>';
+
   document.getElementById("status").innerHTML = \`
     <div class="status"><b>App installerad:</b> \${s.appInstalled ? "Ja" : "Nej"}</div>
-    <div class="status"><b>Spiris ansluten:</b> \${s.spirisConnected ? "Ja" : "Nej"}</div>
+    <div class="status"><b>Spiris:</b> \${spirisBadge}</div>
     <div class="status"><b>Fakturaläge:</b> \${formatInvoiceMode(s.spirisInvoiceMode)}</div>
     <div class="status"><b>Synkade kunder:</b> \${s.customerMappingsCount}</div>
     <div class="status"><b>Synkade produkter:</b> \${s.productMappingsCount}</div>
@@ -643,6 +718,7 @@ document.getElementById("importCustomersBtn").onclick = async function () {
   try {
     setMessage("Importerar 10 kunder...");
     setError("");
+    setImportDetails("");
 
     const res = await fetch("/api2/admin/spiris/customers/import-all", {
       method: "POST",
@@ -676,6 +752,16 @@ document.getElementById("importCustomersBtn").onclick = async function () {
     const mappedCount = data.totals?.mapped || 0;
     const failedCount = data.totals?.failed || 0;
 
+    const failedRows = [];
+
+    for (const page of (data.pages || [])) {
+      for (const row of (page.results || [])) {
+        if (row.status === "failed") {
+          failedRows.push(row);
+        }
+      }
+    }
+
     await loadStatus();
 
     setMessage(
@@ -685,6 +771,21 @@ document.getElementById("importCustomersBtn").onclick = async function () {
       ", redan mappade: " + mappedCount +
       ", fel: " + failedCount + "."
     );
+
+    if (failedRows.length > 0) {
+      const items = failedRows.map(function (row) {
+        const label = row.name || row.email || row.spirisCustomerId || "Okänd kund";
+        const reason = row.error || "Okänt fel";
+        return "<li><b>" + label + "</b>: " + reason + "</li>";
+      }).join("");
+
+      setImportDetails(
+        '<div class="import-details-card">' +
+        '<h4>Poster med fel</h4>' +
+        '<ul>' + items + '</ul>' +
+        '</div>'
+      );
+    }
   } catch (err) {
     setError(err.message || "Customer import failed");
   }
