@@ -671,9 +671,15 @@ async function loadRequiresActionJobs() {
     return;
   }
 
-    const items = data.jobs.map(function (job) {
+  const items = data.jobs.map(function (job) {
     const invoiceId = job.fellowInvoiceId || "Okänd faktura";
     const reason = job.lastErrorText || "Okänd orsak";
+
+    const invoiceLink =
+      "https://crm.fellow.se/location/" +
+      encodeURIComponent(locationId) +
+      "/invoices/" +
+      encodeURIComponent(invoiceId);
 
     const invoiceItems = Array.isArray(job.payload?.invoiceItems)
       ? job.payload.invoiceItems
@@ -687,7 +693,8 @@ async function loadRequiresActionJobs() {
 
     return (
       "<li>" +
-      "<b>Faktura:</b> " + invoiceId +
+      "<b>Faktura:</b> " +
+      '<a href="' + invoiceLink + '" target="_blank">' + invoiceId + "</a>" +
       "<br/><b>Produkter:</b> " + productList +
       "<br/><b>Problem:</b> " + reason +
       "</li>"
