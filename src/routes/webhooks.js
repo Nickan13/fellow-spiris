@@ -22,6 +22,10 @@ function getNextRetryAt(attemptCount) {
 }
 
 router.post("/platform", async (req, res) => {
+
+  console.log("FELLOW INVOICE WEBHOOK PAYLOAD:");
+  console.log(JSON.stringify(req.body, null, 2));
+
   try {
     const body = req.body || {};
 
