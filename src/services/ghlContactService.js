@@ -145,18 +145,40 @@ async function attachContactToBusiness(locationId, contactId, businessId) {
     businessId
   };
 
-  const response = await axios.post(
-    `${env.ghlApiBase}/contacts/bulk/business`,
-    payload,
-    {
-      headers
-    }
-  );
+    try {
+    const response = await axios.post(
+      `${env.ghlApiBase}/contacts/bulk/business`,
+      payload,
+      {
+        headers
+      }
+    );
 
-  return {
-    request: payload,
-    response: response.data
-  };
+    console.log("[attachContactToBusiness] success", {
+      locationId,
+      contactId,
+      businessId,
+      payload,
+      response: response.data
+    });
+
+    return {
+      request: payload,
+      response: response.data
+    };
+  } catch (err) {
+    console.error("[attachContactToBusiness] failed", {
+      locationId,
+      contactId,
+      businessId,
+      payload,
+      status: err.response?.status || null,
+      response: err.response?.data || null,
+      message: err.message
+    });
+
+    throw err;
+  }
 }
 
 module.exports = {
