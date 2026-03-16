@@ -1,6 +1,7 @@
 const articleStore = require("./articleStore");
 const ghlProductService = require("./ghlProductService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
+const fellowCollectionSyncService = require("./fellowCollectionSyncService");
 
 function isImportableSpirisArticle(article) {
   const raw = article?.raw || {};
