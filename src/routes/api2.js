@@ -1235,4 +1235,41 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
   }
 });
 
+router.get("/integration/fellow/product/:locationId/:productId", async (req, res) => {
+  try {
+    const { locationId, productId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    if (!productId) {
+      return res.status(400).json({
+        ok: false,
+        error: "productId is required"
+      });
+    }
+
+    const data = await ghlProductService.getProductById(locationId, productId);
+
+    return res.json({
+      ok: true,
+      locationId,
+      productId,
+      data
+    });
+  } catch (err) {
+    console.error("fellow product by id error:", err.response?.data || err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch Fellow product",
+      details: err.response?.data || err.message
+    });
+  }
+});
+
 module.exports = router;
