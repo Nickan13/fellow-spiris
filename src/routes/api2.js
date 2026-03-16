@@ -678,6 +678,12 @@ select {
   border-color: #bfdbfe;
 }
 
+.pill.neutral {
+  background: #eef2f7;
+  color: #374151;
+  border-color: #dbe3ec;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1018,7 +1024,7 @@ select {
               <option value="draft">Utkast</option>
               <option value="booked">Bokför direkt</option>
             </select>
-            <button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
+            <button class="primary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
           </div>
         </div>
       </section>
@@ -1070,6 +1076,7 @@ const params = new URLSearchParams(window.location.search);
 const locationId = params.get("locationId");
 let connectPopup = null;
 let productImportPollInterval = null;
+let activeProductImportJobId = null;
 
 function setMessage(text) {
   const el = document.getElementById("message");
@@ -1097,19 +1104,11 @@ function formatInvoiceMode(mode) {
   return mode || "";
 }
 
-function getPillClass(type) {
-  if (type === "success") return "pill success";
-  if (type === "danger") return "pill danger";
-  if (type === "warning") return "pill warning";
-  return "pill info";
-}
-
 async function fetchJsonOrThrow(url, options) {
   const res = await fetch(url, options);
-
   const rawText = await res.text();
-  let data = null;
 
+  let data = null;
   try {
     data = rawText ? JSON.parse(rawText) : {};
   } catch (err) {
@@ -1146,7 +1145,6 @@ function updateConnectButton(isConnected) {
     connectBtn.textContent = "Koppla till Spiris";
 
     disconnectBtn.style.display = "none";
-
     help.textContent = "När kopplingen är klar uppdateras sidan automatiskt.";
   }
 }
@@ -1211,7 +1209,6 @@ function renderProductImportResult(job) {
       const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
 
       let reason = row.error || "Okänt fel";
-
       if (typeof reason === "object") {
         reason = reason.message || JSON.stringify(reason);
       }
@@ -1250,15 +1247,15 @@ async function loadStatus() {
   document.getElementById("infoInvoiceMode").textContent = formatInvoiceMode(s.spirisInvoiceMode);
 
   const invoiceModePill = document.getElementById("invoiceModePill");
-  invoiceModePill.className = "pill info";
+  invoiceModePill.className = "pill neutral";
   invoiceModePill.textContent = "Fakturaläge: " + formatInvoiceMode(s.spirisInvoiceMode);
 
   const heroAppInstalledPill = document.getElementById("heroAppInstalledPill");
-  heroAppInstalledPill.className = s.appInstalled ? getPillClass("success") : getPillClass("danger");
+  heroAppInstalledPill.className = s.appInstalled ? "pill neutral" : "pill danger";
   heroAppInstalledPill.textContent = s.appInstalled ? "App installerad" : "App ej installerad";
 
   const heroSpirisPill = document.getElementById("heroSpirisPill");
-  heroSpirisPill.className = s.spirisConnected ? getPillClass("success") : getPillClass("warning");
+  heroSpirisPill.className = s.spirisConnected ? "pill neutral" : "pill warning";
   heroSpirisPill.textContent = s.spirisConnected ? "Spiris anslutet" : "Spiris ej anslutet";
 
   document.getElementById("invoiceModeSelect").value = s.spirisInvoiceMode;
@@ -1311,7 +1308,7 @@ async function loadRequiresActionJobs() {
 
   setRequiresActionDetails(
     '<div class="import-details-card">' +
-    '<ul>' + items + '</ul>' +
+      '<ul>' + items + '</ul>' +
     '</div>'
   );
 }
@@ -1321,11 +1318,12 @@ function stopProductImportPolling() {
     clearInterval(productImportPollInterval);
     productImportPollInterval = null;
   }
+  activeProductImportJobId = null;
 }
 
-async function fetchLatestProductImportJob() {
+async function fetchProductImportJob(jobId) {
   const data = await fetchJsonOrThrow(
-    "/api2/integration/fellow/product-import-status/" + encodeURIComponent(locationId)
+    "/api2/integration/fellow/product-import-job/" + encodeURIComponent(jobId)
   );
 
   return data.job || null;
@@ -1388,9 +1386,7 @@ document.getElementById("disconnectBtn").onclick = async function () {
 
     const data = await fetchJsonOrThrow(
       "/api2/integration/disconnect-spiris/" + encodeURIComponent(locationId),
-      {
-        method: "POST"
-      }
+      { method: "POST" }
     );
 
     setMessage(data.message || "Spiris har kopplats bort.");
@@ -1412,7 +1408,7 @@ document.getElementById("importProductsBtn").onclick = async function () {
     button.disabled = true;
     button.textContent = "Köar import...";
 
-    await fetchJsonOrThrow(
+    const data = await fetchJsonOrThrow(
       "/api2/integration/fellow/import-products/" + encodeURIComponent(locationId),
       {
         method: "POST",
@@ -1425,12 +1421,22 @@ document.getElementById("importProductsBtn").onclick = async function () {
       }
     );
 
+    activeProductImportJobId = data.job?.id || null;
+
+    if (!activeProductImportJobId) {
+      throw new Error("Kunde inte läsa jobb-id för produktimporten");
+    }
+
     setMessage("Produktimport köad. Körs nu i bakgrunden...");
     button.textContent = "Import pågår...";
 
     productImportPollInterval = setInterval(async function () {
       try {
-        const job = await fetchLatestProductImportJob();
+        if (!activeProductImportJobId) {
+          return;
+        }
+
+        const job = await fetchProductImportJob(activeProductImportJobId);
 
         if (!job) {
           return;
@@ -1481,6 +1487,8 @@ document.getElementById("importProductsBtn").onclick = async function () {
 
 document.getElementById("importCustomersBtn").onclick = async function () {
   try {
+    stopProductImportPolling();
+
     const button = document.getElementById("importCustomersBtn");
     button.disabled = true;
     button.textContent = "Importerar kunder...";
@@ -1489,17 +1497,20 @@ document.getElementById("importCustomersBtn").onclick = async function () {
     setError("");
     setImportDetails("");
 
-    const data = await fetchJsonOrThrow("/api2/admin/spiris/customers/import-all", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        locationId,
-        pageSize: 10,
-        maxPages: 1
-      })
-    });
+    const data = await fetchJsonOrThrow(
+      "/api2/admin/spiris/customers/import-all",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          locationId,
+          pageSize: 10,
+          maxPages: 1
+        })
+      }
+    );
 
     const importedCount = data.totals?.total || 0;
     const createdCount = data.totals?.created || 0;
@@ -1521,7 +1532,7 @@ document.getElementById("importCustomersBtn").onclick = async function () {
     await loadRequiresActionJobs();
 
     setMessage(
-      "Import klar. Behandlade: " + importedCount +
+      "Kundimport klar. Behandlade: " + importedCount +
       ", skapade: " + createdCount +
       ", matchade: " + matchedCount +
       ", redan mappade: " + mappedCount +
