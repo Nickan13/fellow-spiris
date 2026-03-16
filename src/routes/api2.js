@@ -825,34 +825,79 @@ document.getElementById("importProductsBtn").onclick = async function () {
     const failedCount = data.failed || 0;
     const totalCount = data.total || 0;
 
+    const resultRows = Array.isArray(data.results) ? data.results : [];
+
+    const totalCreatedPrices = resultRows.reduce(function (sum, row) {
+      return sum + ((row.createdPrices || []).length);
+    }, 0);
+
+    const totalSkippedPrices = resultRows.reduce(function (sum, row) {
+      return sum + ((row.skippedPrices || []).length);
+    }, 0);
+
+    const rowsWithCreatedPrices = resultRows.filter(function (row) {
+      return Array.isArray(row.createdPrices) && row.createdPrices.length > 0;
+    });
+
+    const failedRows = resultRows.filter(function (row) {
+      return row.status === "failed";
+    });
+
     await loadStatus();
     await loadRequiresActionJobs();
 
     setMessage(
       "Produktimport klar. Behandlade: " + totalCount +
-      ", skapade: " + createdCount +
+      ", skapade produkter: " + createdCount +
       ", redan mappade: " + skippedCount +
+      ", skapade priser: " + totalCreatedPrices +
+      ", redan befintliga priser: " + totalSkippedPrices +
       ", fel: " + failedCount + "."
     );
 
-    const failedRows = (data.results || []).filter(function (row) {
-      return row.status === "failed";
-    });
+    const detailSections = [];
 
-    if (failedRows.length > 0) {
-      const items = failedRows.map(function (row) {
+    if (rowsWithCreatedPrices.length > 0) {
+      const createdPriceItems = rowsWithCreatedPrices.map(function (row) {
         const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
-        const reason = row.error || "Okänt fel";
-        return "<li><b>" + label + "</b>: " + reason + "</li>";
+
+        const prices = (row.createdPrices || []).map(function (price) {
+          return price.name + " (" + price.amount + " " + price.currency + ")";
+        }).join(", ");
+
+        return "<li><b>" + label + "</b>: " + prices + "</li>";
       }).join("");
 
-      setImportDetails(
+      detailSections.push(
         '<div class="import-details-card">' +
-        '<h4>Produkter med fel</h4>' +
-        '<ul>' + items + '</ul>' +
+        '<h4>Produkter där nya priser skapades</h4>' +
+        '<ul>' + createdPriceItems + '</ul>' +
         '</div>'
       );
     }
+
+    if (failedRows.length > 0) {
+      const failedItems = failedRows.map(function (row) {
+        const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
+
+        let reason = row.error || "Okänt fel";
+
+        if (typeof reason === "object") {
+          reason = reason.message || JSON.stringify(reason);
+        }
+
+        return "<li><b>" + label + "</b>: " + reason + "</li>";
+      }).join("");
+
+      detailSections.push(
+        '<div class="import-details-card">' +
+        '<h4>Produkter med fel</h4>' +
+        '<ul>' + failedItems + '</ul>' +
+        '</div>'
+      );
+    }
+
+    setImportDetails(detailSections.join(""));
   } catch (err) {
     setError(err.message || "Product import failed");
   } finally {
