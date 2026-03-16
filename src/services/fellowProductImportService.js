@@ -1,7 +1,6 @@
 const articleStore = require("./articleStore");
 const ghlProductService = require("./ghlProductService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
-const fellowCollectionSyncService = require("./fellowCollectionSyncService");
 
 function isImportableSpirisArticle(article) {
   const raw = article?.raw || {};
@@ -92,20 +91,13 @@ async function importProductsForLocation({
         );
 
       if (existingMapping) {
-        const collectionSyncResult =
-          await fellowCollectionSyncService.ensureCollectionsForArticle({
-            locationId,
-            article,
-            fellowProductId: existingMapping.fellowProductId
-          });
-
         skippedAlreadyMapped += 1;
         results.push({
-          status: "skippedAlreadyMapped",
-          spirisArticleNumber,
-          articleName,
-          fellowProductId: existingMapping.fellowProductId,
-          fellowCollectionIds: collectionSyncResult.collectionIds || []
+            status: "created",
+            spirisArticleNumber,
+            articleName,
+            fellowProductId: productId,
+            fellowPriceId: priceResult.price?._id || priceResult.price?.id || null
         });
         continue;
       }
@@ -164,7 +156,6 @@ async function importProductsForLocation({
         articleName,
         fellowProductId: productId,
         fellowPriceId: priceResult.price?._id || priceResult.price?.id || null,
-        fellowCollectionIds: collectionSyncResult.collectionIds || []
       });
 
     } catch (err) {
