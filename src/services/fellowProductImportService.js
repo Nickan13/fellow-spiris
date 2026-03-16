@@ -2,6 +2,8 @@ const articleStore = require("./articleStore");
 const ghlProductService = require("./ghlProductService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
 const fellowCollectionSyncService = require("./fellowCollectionSyncService");
+const tokenService = require("./tokenService");
+const spirisPriceListService = require("./spirisPriceListService");
 
 function isImportableSpirisArticle(article) {
   const raw = article?.raw || {};
@@ -23,6 +25,58 @@ function isImportableSpirisArticle(article) {
 
 function mapSpirisArticleToFellowProductType(article) {
   return article?.raw?.IsStock === true ? "PHYSICAL" : "DIGITAL";
+}
+
+async function createResolvedPricesForProduct({
+  locationId,
+  fellowProductId,
+  article
+}) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  if (!fellowProductId) {
+    throw new Error("fellowProductId is required");
+  }
+
+  if (!article?.spirisArticleId) {
+    throw new Error("article.spirisArticleId is required");
+  }
+
+  const accessToken = await tokenService.getAccessTokenForLocation(locationId);
+
+  const resolved =
+    await spirisPriceListService.getResolvedPricesForArticle({
+      accessToken,
+      articleId: article.spirisArticleId
+    });
+
+  const createdPrices = [];
+
+  for (const price of resolved.prices) {
+    const priceResult = await ghlProductService.createPrice(
+      locationId,
+      fellowProductId,
+      {
+        name: price.fellowPriceName,
+        currency: price.currency || "SEK",
+        amount: price.amount ?? 0,
+        isDigitalProduct: mapSpirisArticleToFellowProductType(article) === "DIGITAL"
+      }
+    );
+
+    createdPrices.push({
+      fellowPriceId: priceResult.price?._id || priceResult.price?.id || null,
+      name: price.fellowPriceName,
+      amount: price.amount ?? 0,
+      currency: price.currency || "SEK",
+      isStandard: price.isStandard === true,
+      salesPriceListId: price.salesPriceListId
+    });
+  }
+
+  return createdPrices;
 }
 
 async function importProductsForLocation({
@@ -125,18 +179,13 @@ async function importProductsForLocation({
         throw new Error("Created Fellow product missing id");
       }
 
-      const priceResult = await ghlProductService.createPrice(
+      const createdPrices = await createResolvedPricesForProduct({
         locationId,
-        productId,
-        {
-          name: "Standardpris",
-          currency: "SEK",
-          amount: article.unitPrice ?? 0,
-          isDigitalProduct: mapSpirisArticleToFellowProductType(article) === "DIGITAL"
-        }
-      );
+        fellowProductId: productId,
+        article
+      });
 
-        await fellowProductMappingRepo.upsertMapping({
+      await fellowProductMappingRepo.upsertMapping({
         locationId,
         fellowProductId: productId,
         spirisArticleNumber
@@ -150,13 +199,13 @@ async function importProductsForLocation({
         });
 
       created += 1;
-      results.push({
-        status: "created",
-        spirisArticleNumber,
-        articleName,
-        fellowProductId: productId,
-        fellowPriceId: priceResult.price?._id || priceResult.price?.id || null,
-      });
+        results.push({
+          status: "created",
+          spirisArticleNumber,
+          articleName,
+          fellowProductId: productId,
+          createdPrices
+        });
 
     } 
     
