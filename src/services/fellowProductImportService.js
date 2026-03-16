@@ -107,21 +107,13 @@ async function importProductsForLocation({
         productType: mapSpirisArticleToFellowProductType(article)
       });
 
-            console.log(
-        "[fellow-product-import][debug] createProduct result:",
-        JSON.stringify(
-          {
-            locationId,
-            spirisArticleNumber,
-            articleName,
-            requestedProductType: mapSpirisArticleToFellowProductType(article),
-            request: productResult.request,
-            response: productResult.response
-          },
-          null,
-          2
-        )
-      );
+      await ghlProductService.updateProduct(
+        locationId,
+        productResult.product?._id || productResult.product?.id,
+        {
+            productType: mapSpirisArticleToFellowProductType(article)
+        }
+        );
 
       const productId =
         productResult.product?._id ||

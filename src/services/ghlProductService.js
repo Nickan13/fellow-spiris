@@ -129,10 +129,36 @@ async function getProductById(locationId, productId) {
   return response.data;
 }
 
+async function updateProduct(locationId, productId, input) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  if (!productId) {
+    throw new Error("productId is required");
+  }
+
+  const headers = await getHeadersForLocation(locationId);
+
+  const payload = {
+    locationId,
+    ...input
+  };
+
+  const response = await axios.put(
+    `${env.ghlApiBase}/products/${productId}`,
+    payload,
+    { headers }
+  );
+
+  return response.data;
+}
+
 module.exports = {
   getHeadersForLocation,
   listProducts,
   getProductById,
   createProduct,
+  updateProduct,
   createPrice
 };
