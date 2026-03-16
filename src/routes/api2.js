@@ -13,6 +13,7 @@ const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappin
 const articleStore = require("../services/articleStore");
 const ghlProductService = require("../services/ghlProductService");
 const fellowProductImportService = require("../services/fellowProductImportService");
+const productImportJobService = require("../services/productImportJobService");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -1257,11 +1258,21 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
       });
     }
 
-    const result = await fellowProductImportService.importProductsForLocation({
+    const jobResult = await productImportJobService.runProductImportJob({
       locationId,
-      limit,
+      importAll,
+      requestedLimit: limit,
       articleFetchLimit
-    });
+  });
+
+const result = jobResult.result || {
+  locationId,
+  total: 0,
+  created: 0,
+  skippedAlreadyMapped: 0,
+  failed: 0,
+  results: []
+};
 
     return res.json({
       ok: true,

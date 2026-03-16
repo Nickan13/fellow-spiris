@@ -141,6 +141,33 @@ function runMigrations() {
         ON spiris_customer_mappings(location_id)
     `);
 
+        db.run(`
+      CREATE TABLE IF NOT EXISTS product_import_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        import_all INTEGER NOT NULL DEFAULT 0,
+        requested_limit INTEGER,
+        article_fetch_limit INTEGER,
+        result_json TEXT,
+        last_error_text TEXT,
+        locked_at TEXT,
+        processed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_product_import_jobs_location
+        ON product_import_jobs(location_id)
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_product_import_jobs_status
+        ON product_import_jobs(status)
+    `);
+
     console.log("Database migrations completed");
 
   });
