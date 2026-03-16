@@ -92,12 +92,20 @@ async function importProductsForLocation({
         );
 
       if (existingMapping) {
+        const collectionSyncResult =
+          await fellowCollectionSyncService.ensureCollectionsForArticle({
+            locationId,
+            article,
+            fellowProductId: existingMapping.fellowProductId
+          });
+
         skippedAlreadyMapped += 1;
         results.push({
           status: "skippedAlreadyMapped",
           spirisArticleNumber,
           articleName,
-          fellowProductId: existingMapping.fellowProductId
+          fellowProductId: existingMapping.fellowProductId,
+          fellowCollectionIds: collectionSyncResult.collectionIds || []
         });
         continue;
       }
