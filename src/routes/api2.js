@@ -443,7 +443,7 @@ body {
 }
 
 .hero {
-  background: linear-gradient(135deg, #82358b 0%, #5b2b91 100%);
+  background: linear-gradient(135deg, #82358b 0%, #64256e 100%);
   color: white;
   border-radius: 24px;
   padding: 28px;
@@ -995,7 +995,7 @@ select {
             Befintliga mappingar återanvänds och nya kontakter skapas vid behov.
           </p>
           <div class="actions-row">
-            <button class="secondary" id="importCustomersBtn">Importera kunder</button>
+            <button class="primary" id="importCustomersBtn">Importera kunder</button>
           </div>
         </div>
       </section>
@@ -1069,13 +1069,18 @@ select {
 const params = new URLSearchParams(window.location.search);
 const locationId = params.get("locationId");
 let connectPopup = null;
+let productImportPollInterval = null;
 
 function setMessage(text) {
-  document.getElementById("message").textContent = text || "";
+  const el = document.getElementById("message");
+  el.textContent = text || "";
+  el.style.display = text ? "block" : "none";
 }
 
 function setError(text) {
-  document.getElementById("error").textContent = text || "";
+  const el = document.getElementById("error");
+  el.textContent = text || "";
+  el.style.display = text ? "block" : "none";
 }
 
 function setImportDetails(html) {
@@ -1099,49 +1104,154 @@ function getPillClass(type) {
   return "pill info";
 }
 
+async function fetchJsonOrThrow(url, options) {
+  const res = await fetch(url, options);
+
+  const rawText = await res.text();
+  let data = null;
+
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch (err) {
+    throw new Error("Endpoint returned non-JSON response: " + rawText.slice(0, 200));
+  }
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || data.details || "Request failed");
+  }
+
+  return data;
+}
+
 function updateConnectButton(isConnected) {
   const connectBtn = document.getElementById("connectBtn");
   const disconnectBtn = document.getElementById("disconnectBtn");
   const help = document.getElementById("connectHelpText");
 
   if (isConnected) {
-    connectBtn.style.display = "none";
+    connectBtn.style.display = "inline-flex";
+    connectBtn.disabled = true;
+    connectBtn.className = "secondary";
+    connectBtn.textContent = "Spiris är anslutet";
+
     disconnectBtn.style.display = "inline-flex";
-    help.textContent = "Spiris är anslutet för detta subaccount. Du kan koppla bort integrationen här om det behövs.";
+    disconnectBtn.className = "ghost-danger";
+    disconnectBtn.textContent = "Koppla bort Spiris";
+
+    help.textContent = "Spiris är anslutet för detta subaccount.";
   } else {
     connectBtn.style.display = "inline-flex";
+    connectBtn.disabled = false;
+    connectBtn.className = "primary";
+    connectBtn.textContent = "Koppla till Spiris";
+
     disconnectBtn.style.display = "none";
+
     help.textContent = "När kopplingen är klar uppdateras sidan automatiskt.";
   }
 }
 
-async function loadStatus() {
-  setMessage("");
-  setError("");
-  setImportDetails("");
+function renderProductImportResult(job) {
+  const result = job?.result || {};
+  const resultRows = Array.isArray(result.results) ? result.results : [];
 
-  const res = await fetch("/api2/integration/status/" + encodeURIComponent(locationId));
-  const data = await res.json();
+  const createdCount = result.created || 0;
+  const skippedCount = result.skippedAlreadyMapped || 0;
+  const failedCount = result.failed || 0;
+  const totalCount = result.total || 0;
 
-  if (!res.ok || !data.ok || !data.status) {
-    throw new Error(data.error || "Failed to load integration status");
+  const totalCreatedPrices = resultRows.reduce(function (sum, row) {
+    return sum + ((row.createdPrices || []).length);
+  }, 0);
+
+  const totalSkippedPrices = resultRows.reduce(function (sum, row) {
+    return sum + ((row.skippedPrices || []).length);
+  }, 0);
+
+  const rowsWithCreatedPrices = resultRows.filter(function (row) {
+    return Array.isArray(row.createdPrices) && row.createdPrices.length > 0;
+  });
+
+  const failedRows = resultRows.filter(function (row) {
+    return row.status === "failed";
+  });
+
+  setMessage(
+    "Produktimport klar. Behandlade: " + totalCount +
+    ", skapade produkter: " + createdCount +
+    ", redan mappade: " + skippedCount +
+    ", skapade priser: " + totalCreatedPrices +
+    ", redan befintliga priser: " + totalSkippedPrices +
+    ", fel: " + failedCount + "."
+  );
+
+  const detailSections = [];
+
+  if (rowsWithCreatedPrices.length > 0) {
+    const createdPriceItems = rowsWithCreatedPrices.map(function (row) {
+      const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
+
+      const prices = (row.createdPrices || []).map(function (price) {
+        return price.name + " (" + price.amount + " " + price.currency + ")";
+      }).join(", ");
+
+      return "<li><b>" + label + "</b>: " + prices + "</li>";
+    }).join("");
+
+    detailSections.push(
+      '<div class="import-details-card">' +
+      '<h4>Produkter där nya priser skapades</h4>' +
+      '<ul>' + createdPriceItems + '</ul>' +
+      '</div>'
+    );
   }
+
+  if (failedRows.length > 0) {
+    const failedItems = failedRows.map(function (row) {
+      const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
+
+      let reason = row.error || "Okänt fel";
+
+      if (typeof reason === "object") {
+        reason = reason.message || JSON.stringify(reason);
+      }
+
+      return "<li><b>" + label + "</b>: " + reason + "</li>";
+    }).join("");
+
+    detailSections.push(
+      '<div class="import-details-card">' +
+      '<h4>Produkter med fel</h4>' +
+      '<ul>' + failedItems + '</ul>' +
+      '</div>'
+    );
+  }
+
+  setImportDetails(detailSections.join(""));
+}
+
+async function loadStatus() {
+  const data = await fetchJsonOrThrow(
+    "/api2/integration/status/" + encodeURIComponent(locationId)
+  );
 
   const s = data.status;
 
-  document.getElementById("summaryCustomers").textContent = s.customerMappingsCount;
-  document.getElementById("summaryProducts").textContent = s.productMappingsCount;
-  document.getElementById("summaryInvoices").textContent = s.invoiceMappingsCount;
-  document.getElementById("summaryRequiresAction").textContent = s.requiresActionCount;
+  document.getElementById("summaryCustomers").textContent = s.customerMappingsCount ?? "-";
+  document.getElementById("summaryProducts").textContent = s.productMappingsCount ?? "-";
+  document.getElementById("summaryInvoices").textContent = s.invoiceMappingsCount ?? "-";
+  document.getElementById("summaryRequiresAction").textContent = s.requiresActionCount ?? "-";
 
-  document.getElementById("metricRetryJobs").textContent = s.retryJobsCount;
-  document.getElementById("metricFailedJobs").textContent = s.failedJobsCount;
+  document.getElementById("metricRetryJobs").textContent = s.retryJobsCount ?? "-";
+  document.getElementById("metricFailedJobs").textContent = s.failedJobsCount ?? "-";
 
   document.getElementById("infoAppInstalled").textContent = s.appInstalled ? "Ja" : "Nej";
   document.getElementById("infoSpirisConnected").textContent = s.spirisConnected ? "Ja" : "Nej";
   document.getElementById("infoInvoiceMode").textContent = formatInvoiceMode(s.spirisInvoiceMode);
 
-  document.getElementById("invoiceModePill").textContent = "Fakturaläge: " + formatInvoiceMode(s.spirisInvoiceMode);
+  const invoiceModePill = document.getElementById("invoiceModePill");
+  invoiceModePill.className = "pill info";
+  invoiceModePill.textContent = "Fakturaläge: " + formatInvoiceMode(s.spirisInvoiceMode);
 
   const heroAppInstalledPill = document.getElementById("heroAppInstalledPill");
   heroAppInstalledPill.className = s.appInstalled ? getPillClass("success") : getPillClass("danger");
@@ -1156,15 +1266,9 @@ async function loadStatus() {
 }
 
 async function loadRequiresActionJobs() {
-  const res = await fetch(
+  const data = await fetchJsonOrThrow(
     "/api2/integration/requires-action/" + encodeURIComponent(locationId)
   );
-
-  const data = await res.json();
-
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || "Failed to load requires-action jobs");
-  }
 
   if (!data.jobs || data.jobs.length === 0) {
     setRequiresActionDetails(
@@ -1210,6 +1314,21 @@ async function loadRequiresActionJobs() {
     '<ul>' + items + '</ul>' +
     '</div>'
   );
+}
+
+function stopProductImportPolling() {
+  if (productImportPollInterval) {
+    clearInterval(productImportPollInterval);
+    productImportPollInterval = null;
+  }
+}
+
+async function fetchLatestProductImportJob() {
+  const data = await fetchJsonOrThrow(
+    "/api2/integration/fellow/product-import-status/" + encodeURIComponent(locationId)
+  );
+
+  return data.job || null;
 }
 
 window.addEventListener("message", async function (event) {
@@ -1267,20 +1386,14 @@ document.getElementById("disconnectBtn").onclick = async function () {
     setMessage("Kopplar bort Spiris...");
     setError("");
 
-    const res = await fetch(
+    const data = await fetchJsonOrThrow(
       "/api2/integration/disconnect-spiris/" + encodeURIComponent(locationId),
       {
         method: "POST"
       }
     );
 
-    const data = await res.json();
-
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || "Failed to disconnect Spiris");
-    }
-
-    setMessage("Spiris har kopplats bort.");
+    setMessage(data.message || "Spiris har kopplats bort.");
     await loadStatus();
     await loadRequiresActionJobs();
   } catch (err) {
@@ -1290,15 +1403,16 @@ document.getElementById("disconnectBtn").onclick = async function () {
 
 document.getElementById("importProductsBtn").onclick = async function () {
   try {
-    setMessage("Importerar produkter från Spiris...");
+    stopProductImportPolling();
+    setMessage("Köar produktimport från Spiris...");
     setError("");
     setImportDetails("");
 
     const button = document.getElementById("importProductsBtn");
     button.disabled = true;
-    button.textContent = "Importerar...";
+    button.textContent = "Köar import...";
 
-    const res = await fetch(
+    await fetchJsonOrThrow(
       "/api2/integration/fellow/import-products/" + encodeURIComponent(locationId),
       {
         method: "POST",
@@ -1311,93 +1425,54 @@ document.getElementById("importProductsBtn").onclick = async function () {
       }
     );
 
-    const data = await res.json();
+    setMessage("Produktimport köad. Körs nu i bakgrunden...");
+    button.textContent = "Import pågår...";
 
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || data.details || "Product import failed");
-    }
+    productImportPollInterval = setInterval(async function () {
+      try {
+        const job = await fetchLatestProductImportJob();
 
-    const createdCount = data.created || 0;
-    const skippedCount = data.skippedAlreadyMapped || 0;
-    const failedCount = data.failed || 0;
-    const totalCount = data.total || 0;
-
-    const resultRows = Array.isArray(data.results) ? data.results : [];
-
-    const totalCreatedPrices = resultRows.reduce(function (sum, row) {
-      return sum + ((row.createdPrices || []).length);
-    }, 0);
-
-    const totalSkippedPrices = resultRows.reduce(function (sum, row) {
-      return sum + ((row.skippedPrices || []).length);
-    }, 0);
-
-    const rowsWithCreatedPrices = resultRows.filter(function (row) {
-      return Array.isArray(row.createdPrices) && row.createdPrices.length > 0;
-    });
-
-    const failedRows = resultRows.filter(function (row) {
-      return row.status === "failed";
-    });
-
-    await loadStatus();
-    await loadRequiresActionJobs();
-
-    setMessage(
-      "Produktimport klar. Behandlade: " + totalCount +
-      ", skapade produkter: " + createdCount +
-      ", redan mappade: " + skippedCount +
-      ", skapade priser: " + totalCreatedPrices +
-      ", redan befintliga priser: " + totalSkippedPrices +
-      ", fel: " + failedCount + "."
-    );
-
-    const detailSections = [];
-
-    if (rowsWithCreatedPrices.length > 0) {
-      const createdPriceItems = rowsWithCreatedPrices.map(function (row) {
-        const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
-
-        const prices = (row.createdPrices || []).map(function (price) {
-          return price.name + " (" + price.amount + " " + price.currency + ")";
-        }).join(", ");
-
-        return "<li><b>" + label + "</b>: " + prices + "</li>";
-      }).join("");
-
-      detailSections.push(
-        '<div class="import-details-card">' +
-        '<h4>Produkter där nya priser skapades</h4>' +
-        '<ul>' + createdPriceItems + '</ul>' +
-        '</div>'
-      );
-    }
-
-    if (failedRows.length > 0) {
-      const failedItems = failedRows.map(function (row) {
-        const label = row.articleName || row.spirisArticleNumber || "Okänd artikel";
-
-        let reason = row.error || "Okänt fel";
-
-        if (typeof reason === "object") {
-          reason = reason.message || JSON.stringify(reason);
+        if (!job) {
+          return;
         }
 
-        return "<li><b>" + label + "</b>: " + reason + "</li>";
-      }).join("");
+        if (job.status === "pending" || job.status === "processing") {
+          setMessage("Produktimport pågår i bakgrunden...");
+          return;
+        }
 
-      detailSections.push(
-        '<div class="import-details-card">' +
-        '<h4>Produkter med fel</h4>' +
-        '<ul>' + failedItems + '</ul>' +
-        '</div>'
-      );
-    }
+        stopProductImportPolling();
 
-    setImportDetails(detailSections.join(""));
+        await loadStatus();
+        await loadRequiresActionJobs();
+
+        if (job.status === "completed") {
+          renderProductImportResult(job);
+          button.disabled = false;
+          button.textContent = "Importera produkter";
+          return;
+        }
+
+        if (job.status === "failed") {
+          setError(job.lastErrorText || "Product import failed");
+          button.disabled = false;
+          button.textContent = "Importera produkter";
+          return;
+        }
+
+        setError("Produktimporten avslutades i okänt läge.");
+        button.disabled = false;
+        button.textContent = "Importera produkter";
+      } catch (pollErr) {
+        stopProductImportPolling();
+        setError(pollErr.message || "Failed to poll product import status");
+        button.disabled = false;
+        button.textContent = "Importera produkter";
+      }
+    }, 3000);
   } catch (err) {
+    stopProductImportPolling();
     setError(err.message || "Product import failed");
-  } finally {
     const button = document.getElementById("importProductsBtn");
     button.disabled = false;
     button.textContent = "Importera produkter";
@@ -1406,11 +1481,15 @@ document.getElementById("importProductsBtn").onclick = async function () {
 
 document.getElementById("importCustomersBtn").onclick = async function () {
   try {
+    const button = document.getElementById("importCustomersBtn");
+    button.disabled = true;
+    button.textContent = "Importerar kunder...";
+
     setMessage("Importerar 10 kunder...");
     setError("");
     setImportDetails("");
 
-    const res = await fetch("/api2/admin/spiris/customers/import-all", {
+    const data = await fetchJsonOrThrow("/api2/admin/spiris/customers/import-all", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1420,21 +1499,7 @@ document.getElementById("importCustomersBtn").onclick = async function () {
         pageSize: 10,
         maxPages: 1
       })
-    );
-
-    const rawText = await res.text();
-
-    let data = null;
-
-    try {
-      data = JSON.parse(rawText);
-    } catch (parseErr) {
-      throw new Error("Import endpoint returned non-JSON response: " + rawText.slice(0, 300));
-    }
-
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || data.details || "Customer import failed");
-    }
+    });
 
     const importedCount = data.totals?.total || 0;
     const createdCount = data.totals?.created || 0;
@@ -1497,21 +1562,18 @@ document.getElementById("saveInvoiceModeBtn").onclick = async function () {
     saveButton.disabled = true;
     saveButton.textContent = "Sparar...";
 
-    const saveRes = await fetch("/api2/settings/" + encodeURIComponent(locationId) + "/invoice-mode", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        spirisInvoiceMode: selectedMode
-      })
-    });
-
-    const saveData = await saveRes.json();
-
-    if (!saveRes.ok || !saveData.ok) {
-      throw new Error(saveData.error || "Failed to update invoice mode");
-    }
+    await fetchJsonOrThrow(
+      "/api2/settings/" + encodeURIComponent(locationId) + "/invoice-mode",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          spirisInvoiceMode: selectedMode
+        })
+      }
+    );
 
     await loadStatus();
     await loadRequiresActionJobs();
@@ -1525,13 +1587,15 @@ document.getElementById("saveInvoiceModeBtn").onclick = async function () {
   }
 };
 
+setMessage("");
+setError("");
+
 Promise.all([
   loadStatus(),
   loadRequiresActionJobs()
 ]).catch((err) => {
   setError(err.message || "Failed to load page data");
 });
-
 </script>
 
 </body>
