@@ -71,6 +71,11 @@ async function createCollection(locationId, name) {
     }
   );
 
+  console.log(
+    "[ghl-collection-service][debug] createCollection response:",
+    JSON.stringify(response.data, null, 2)
+  );
+
   return response.data;
 }
 
