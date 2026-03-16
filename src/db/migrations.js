@@ -117,6 +117,25 @@ function runMigrations() {
       )
     `);
 
+        db.run(`
+      CREATE TABLE IF NOT EXISTS spiris_article_label_collections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location_id TEXT NOT NULL,
+        spiris_label_id TEXT NOT NULL,
+        spiris_label_name TEXT,
+        fellow_collection_id TEXT NOT NULL,
+        fellow_collection_name TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(location_id, spiris_label_id)
+      )
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_spiris_article_label_collections_location
+        ON spiris_article_label_collections(location_id)
+    `);
+
     db.run(`
       CREATE INDEX IF NOT EXISTS idx_spiris_customer_mappings_location
         ON spiris_customer_mappings(location_id)
