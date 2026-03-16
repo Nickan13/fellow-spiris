@@ -90,31 +90,30 @@ async function importProductsForLocation({
           spirisArticleNumber
         );
 
-      if (existingMapping) {
+          if (existingMapping) {
+        const collectionSyncResult =
+          await fellowCollectionSyncService.ensureCollectionsForArticle({
+            locationId,
+            article,
+            fellowProductId: existingMapping.fellowProductId
+          });
+
         skippedAlreadyMapped += 1;
         results.push({
-            status: "created",
-            spirisArticleNumber,
-            articleName,
-            fellowProductId: productId,
-            fellowPriceId: priceResult.price?._id || priceResult.price?.id || null
+          status: "skippedAlreadyMapped",
+          spirisArticleNumber,
+          articleName,
+          fellowProductId: existingMapping.fellowProductId,
+          fellowCollectionIds: collectionSyncResult.collectionIds || []
         });
         continue;
       }
 
-      const productResult = await ghlProductService.createProduct(locationId, {
+    const productResult = await ghlProductService.createProduct(locationId, {
         name: articleName,
         description: "",
         productType: mapSpirisArticleToFellowProductType(article)
       });
-
-      await ghlProductService.updateProduct(
-        locationId,
-        productResult.product?._id || productResult.product?.id,
-        {
-            productType: mapSpirisArticleToFellowProductType(article)
-        }
-        );
 
       const productId =
         productResult.product?._id ||
@@ -124,6 +123,14 @@ async function importProductsForLocation({
       if (!productId) {
         throw new Error("Created Fellow product missing id");
       }
+
+      await ghlProductService.updateProduct(
+        locationId,
+        productResult.product?._id || productResult.product?.id,
+        {
+            productType: mapSpirisArticleToFellowProductType(article)
+        }
+        );
 
       const priceResult = await ghlProductService.createPrice(
         locationId,
@@ -136,7 +143,7 @@ async function importProductsForLocation({
         }
       );
 
-    await fellowProductMappingRepo.upsertMapping({
+        await fellowProductMappingRepo.upsertMapping({
         locationId,
         fellowProductId: productId,
         spirisArticleNumber
@@ -158,7 +165,9 @@ async function importProductsForLocation({
         fellowPriceId: priceResult.price?._id || priceResult.price?.id || null,
       });
 
-    } catch (err) {
+    } 
+    
+    catch (err) {
       failed += 1;
       results.push({
         status: "failed",
