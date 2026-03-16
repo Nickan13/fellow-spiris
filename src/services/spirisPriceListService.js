@@ -28,75 +28,8 @@ function isActivePriceList(priceList) {
   return priceList?.IsActive === true;
 }
 
-function buildPriceListIndex(priceLists) {
-  const index = new Map();
-
-  for (const priceList of priceLists || []) {
-    if (!priceList?.Id) {
-      continue;
-    }
-
-    index.set(String(priceList.Id), priceList);
-  }
-
-  return index;
-}
-
-function getPricesForArticleFromPriceEntries({
-  articleId,
-  salesPriceLists,
-  salesPriceListPrices
-}) {
-  if (!articleId) {
-    throw new Error("articleId is required");
-  }
-
-  const priceLists = Array.isArray(salesPriceLists?.Data)
-    ? salesPriceLists.Data
-    : [];
-
-  const priceEntries = Array.isArray(salesPriceListPrices?.Data)
-    ? salesPriceListPrices.Data
-    : [];
-
-  const priceListIndex = buildPriceListIndex(priceLists);
-
-  const matchingEntries = priceEntries.filter((entry) => {
-    return String(entry?.ArticleId || "") === String(articleId);
-  });
-
-  const results = [];
-
-  for (const entry of matchingEntries) {
-    const salesPriceListId = String(entry?.SalesPriceListId || "");
-    const priceList = priceListIndex.get(salesPriceListId);
-
-    if (!priceList) {
-      continue;
-    }
-
-    if (!isActivePriceList(priceList)) {
-      continue;
-    }
-
-    results.push({
-      salesPriceListId,
-      spirisArticleId: String(entry.ArticleId),
-      fellowPriceName: mapSpirisPriceEntryToFellowPriceName(priceList),
-      amount: mapSpirisPriceEntryAmount(entry),
-      currency: entry?.CurrencyCode || priceList?.CurrencyCode || "SEK",
-      isStandard: priceList?.IsStandard === true,
-      source: {
-        priceListName: priceList?.Name || null,
-        priceListNumber: priceList?.Number || null,
-        netPrice: entry?.NetPrice ?? null,
-        grossPrice: entry?.GrossPrice ?? null,
-        changedUtc: entry?.ChangedUtc || null
-      }
-    });
-  }
-
-  results.sort((a, b) => {
+function sortAndDeduplicateResolvedPrices(prices) {
+  const sorted = [...prices].sort((a, b) => {
     if (a.isStandard && !b.isStandard) return -1;
     if (!a.isStandard && b.isStandard) return 1;
     return a.fellowPriceName.localeCompare(b.fellowPriceName, "sv");
@@ -105,7 +38,7 @@ function getPricesForArticleFromPriceEntries({
   const deduped = [];
   const seenNames = new Set();
 
-  for (const row of results) {
+  for (const row of sorted) {
     const key = row.fellowPriceName;
 
     if (seenNames.has(key)) {
@@ -117,6 +50,27 @@ function getPricesForArticleFromPriceEntries({
   }
 
   return deduped;
+}
+
+function mapResolvedPrice({
+  priceList,
+  priceEntry
+}) {
+  return {
+    salesPriceListId: String(priceList.Id),
+    spirisArticleId: String(priceEntry.ArticleId),
+    fellowPriceName: mapSpirisPriceEntryToFellowPriceName(priceList),
+    amount: mapSpirisPriceEntryAmount(priceEntry),
+    currency: priceEntry?.CurrencyCode || priceList?.CurrencyCode || "SEK",
+    isStandard: priceList?.IsStandard === true,
+    source: {
+      priceListName: priceList?.Name || null,
+      priceListNumber: priceList?.Number || null,
+      netPrice: priceEntry?.NetPrice ?? null,
+      grossPrice: priceEntry?.GrossPrice ?? null,
+      changedUtc: priceEntry?.ChangedUtc || null
+    }
+  };
 }
 
 async function getResolvedPricesForArticle({
@@ -132,18 +86,49 @@ async function getResolvedPricesForArticle({
   }
 
   const salesPriceLists = await spirisService.getSalesPriceLists(accessToken);
-  const salesPriceListPrices = await spirisService.getSalesPriceListPrices(accessToken);
 
-  const prices = getPricesForArticleFromPriceEntries({
-    articleId,
-    salesPriceLists,
-    salesPriceListPrices
+  const priceLists = Array.isArray(salesPriceLists?.Data)
+    ? salesPriceLists.Data
+    : [];
+
+  const activePriceLists = priceLists.filter((priceList) => {
+    return isActivePriceList(priceList);
   });
+
+  const resolvedPrices = [];
+
+  for (const priceList of activePriceLists) {
+    try {
+      const priceEntry = await spirisService.getSalesPriceForArticleInPriceList(
+        accessToken,
+        priceList.Id,
+        articleId
+      );
+
+      if (!priceEntry?.ArticleId || !priceEntry?.SalesPriceListId) {
+        continue;
+      }
+
+      resolvedPrices.push(
+        mapResolvedPrice({
+          priceList,
+          priceEntry
+        })
+      );
+    } catch (err) {
+      const status = err?.response?.status;
+
+      if (status === 404) {
+        continue;
+      }
+
+      throw err;
+    }
+  }
 
   return {
     salesPriceLists,
-    salesPriceListPrices,
-    prices
+    prices: sortAndDeduplicateResolvedPrices(resolvedPrices)
   };
 }
 
@@ -151,6 +136,5 @@ module.exports = {
   normalizePriceListName,
   mapSpirisPriceEntryToFellowPriceName,
   mapSpirisPriceEntryAmount,
-  getPricesForArticleFromPriceEntries,
   getResolvedPricesForArticle
 };
