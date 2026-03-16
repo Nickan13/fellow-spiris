@@ -125,14 +125,6 @@ async function importProductsForLocation({
         throw new Error("Created Fellow product missing id");
       }
 
-      await ghlProductService.updateProduct(
-        locationId,
-        productResult.product?._id || productResult.product?.id,
-        {
-            productType: mapSpirisArticleToFellowProductType(article)
-        }
-        );
-
       const priceResult = await ghlProductService.createPrice(
         locationId,
         productId,

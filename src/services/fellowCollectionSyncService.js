@@ -78,24 +78,34 @@ async function ensureCollectionsForArticle({
       if (existingCollection?._id || existingCollection?.id) {
         fellowCollectionId = existingCollection._id || existingCollection.id;
         fellowCollectionName = existingCollection.name || spirisLabelName;
-      } else {
-        const createdCollection =
-          await ghlCollectionService.createCollection(locationId, spirisLabelName);
+            } else {
+        await ghlCollectionService.createCollection(locationId, spirisLabelName);
+
+        const refreshedCollectionsResponse =
+          await ghlCollectionService.listCollections(locationId);
+
+        const refreshedCollections = Array.isArray(refreshedCollectionsResponse?.collections)
+          ? refreshedCollectionsResponse.collections
+          : Array.isArray(refreshedCollectionsResponse?.data?.collections)
+            ? refreshedCollectionsResponse.data.collections
+            : [];
+
+        const createdCollection = refreshedCollections.find((collection) => {
+          return String(collection?.name || "").trim().toLowerCase() ===
+            String(spirisLabelName).trim().toLowerCase();
+        });
 
         fellowCollectionId =
           createdCollection?._id ||
           createdCollection?.id ||
-          createdCollection?.collection?._id ||
-          createdCollection?.collection?.id ||
           null;
 
         fellowCollectionName =
           createdCollection?.name ||
-          createdCollection?.collection?.name ||
           spirisLabelName;
 
         if (!fellowCollectionId) {
-          throw new Error(`Failed to create Fellow collection for label ${spirisLabelName}`);
+          throw new Error(`Failed to resolve Fellow collection for label ${spirisLabelName}`);
         }
       }
 
