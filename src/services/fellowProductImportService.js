@@ -79,6 +79,95 @@ async function createResolvedPricesForProduct({
   return createdPrices;
 }
 
+async function ensureMissingResolvedPricesForProduct({
+  locationId,
+  fellowProductId,
+  article
+}) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  if (!fellowProductId) {
+    throw new Error("fellowProductId is required");
+  }
+
+  if (!article?.spirisArticleId) {
+    throw new Error("article.spirisArticleId is required");
+  }
+
+  const accessToken = await tokenService.getAccessTokenForLocation(locationId);
+
+  const resolved =
+    await spirisPriceListService.getResolvedPricesForArticle({
+      accessToken,
+      articleId: article.spirisArticleId
+    });
+
+  const existingPricesResponse =
+    await ghlProductService.listPricesForProduct(locationId, fellowProductId);
+
+  const existingPrices = Array.isArray(existingPricesResponse?.prices)
+    ? existingPricesResponse.prices
+    : Array.isArray(existingPricesResponse?.data?.prices)
+      ? existingPricesResponse.data.prices
+      : [];
+
+  const existingPriceNames = new Set(
+    existingPrices.map((price) => String(price?.name || "").trim())
+  );
+
+  const createdPrices = [];
+  const skippedPrices = [];
+
+  for (const price of resolved.prices) {
+    const fellowPriceName = String(price.fellowPriceName || "").trim();
+
+    if (!fellowPriceName) {
+      continue;
+    }
+
+    if (existingPriceNames.has(fellowPriceName)) {
+      skippedPrices.push({
+        name: fellowPriceName,
+        amount: price.amount ?? 0,
+        currency: price.currency || "SEK",
+        isStandard: price.isStandard === true,
+        salesPriceListId: price.salesPriceListId
+      });
+      continue;
+    }
+
+    const priceResult = await ghlProductService.createPrice(
+      locationId,
+      fellowProductId,
+      {
+        name: fellowPriceName,
+        currency: price.currency || "SEK",
+        amount: price.amount ?? 0,
+        isDigitalProduct: mapSpirisArticleToFellowProductType(article) === "DIGITAL"
+      }
+    );
+
+    createdPrices.push({
+      fellowPriceId: priceResult.price?._id || priceResult.price?.id || null,
+      name: fellowPriceName,
+      amount: price.amount ?? 0,
+      currency: price.currency || "SEK",
+      isStandard: price.isStandard === true,
+      salesPriceListId: price.salesPriceListId
+    });
+
+    existingPriceNames.add(fellowPriceName);
+  }
+
+  return {
+    createdPrices,
+    skippedPrices,
+    totalResolvedPrices: resolved.prices.length
+  };
+}
+
 async function importProductsForLocation({
   locationId,
   limit = 10,
@@ -145,7 +234,14 @@ async function importProductsForLocation({
           spirisArticleNumber
         );
 
-          if (existingMapping) {
+            if (existingMapping) {
+        const priceSyncResult =
+          await ensureMissingResolvedPricesForProduct({
+            locationId,
+            fellowProductId: existingMapping.fellowProductId,
+            article
+          });
+
         const collectionSyncResult =
           await fellowCollectionSyncService.ensureCollectionsForArticle({
             locationId,
@@ -159,7 +255,10 @@ async function importProductsForLocation({
           spirisArticleNumber,
           articleName,
           fellowProductId: existingMapping.fellowProductId,
-          fellowCollectionIds: collectionSyncResult.collectionIds || []
+          fellowCollectionIds: collectionSyncResult.collectionIds || [],
+          createdPrices: priceSyncResult.createdPrices,
+          skippedPrices: priceSyncResult.skippedPrices,
+          totalResolvedPrices: priceSyncResult.totalResolvedPrices
         });
         continue;
       }
