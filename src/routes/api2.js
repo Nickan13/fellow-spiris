@@ -13,6 +13,24 @@ const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappin
 const articleStore = require("../services/articleStore");
 const ghlProductService = require("../services/ghlProductService");
 
+function isImportableSpirisArticle(article) {
+  const raw = article?.raw || {};
+
+  const isActive = raw.IsActive === true;
+
+  const codingName = String(raw.CodingName || "").trim().toLowerCase();
+  const articleName = String(raw.Name || article?.name || "").trim().toLowerCase();
+
+  const isAccountingArticle =
+    articleName === "ränta" ||
+    codingName === "ränta";
+
+  return (
+    isActive &&
+    !isAccountingArticle
+  );
+}
+
 router.get("/oauth/callback", async (req, res) => {
   try {
     const code = req.query.code;
@@ -1143,10 +1161,10 @@ router.post("/integration/fellow/test-create-product/:locationId", async (req, r
 
     const article = articles[0];
 
-        const result = await ghlProductService.createProduct(locationId, {
+    const result = await ghlProductService.createProduct(locationId, {
       name: article.name || article.articleNumber,
-      description: `Spiris article ${article.articleNumber}`,
-      productType: "SERVICE"
+      description: "",
+      productType: article?.raw?.IsStock === true ? "PHYSICAL" : "SERVICE"
     });
 
     const productId =
@@ -1209,7 +1227,7 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
 
     const activeArticles = (articles || [])
       .filter((article) => {
-        return article?.raw?.IsActive === true;
+        return isImportableSpirisArticle(article);
       })
       .slice(0, limit);
 
@@ -1265,7 +1283,7 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
         const productResult = await ghlProductService.createProduct(locationId, {
           name: articleName,
           description: `Spiris article ${spirisArticleNumber}`,
-          productType: "SERVICE"
+          productType: article?.raw?.IsStock === true ? "PHYSICAL" : "SERVICE"
         });
 
         const productId =
