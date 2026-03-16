@@ -1272,4 +1272,34 @@ router.get("/integration/fellow/product-prices/:locationId/:productId", async (r
   }
 });
 
+router.get("/integration/fellow/collections/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const ghlCollectionService = require("../services/ghlCollectionService");
+    const data = await ghlCollectionService.listCollections(locationId);
+
+    return res.json({
+      ok: true,
+      locationId,
+      data
+    });
+  } catch (err) {
+    console.error("fellow collections debug error:", err.response?.data || err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch Fellow collections",
+      details: err.response?.data || err.message
+    });
+  }
+});
+
 module.exports = router;
