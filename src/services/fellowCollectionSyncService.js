@@ -36,11 +36,9 @@ async function ensureCollectionsForArticle({
   const existingCollectionsResponse =
     await ghlCollectionService.listCollections(locationId);
 
-  const existingCollections = Array.isArray(existingCollectionsResponse?.collections)
-    ? existingCollectionsResponse.collections
-    : Array.isArray(existingCollectionsResponse?.data?.collections)
-      ? existingCollectionsResponse.data.collections
-      : [];
+    const existingCollections = Array.isArray(existingCollectionsResponse?.data?.data)
+    ? existingCollectionsResponse.data.data
+    : [];
 
   const collectionIds = [];
   const results = [];
@@ -84,11 +82,9 @@ async function ensureCollectionsForArticle({
         const refreshedCollectionsResponse =
           await ghlCollectionService.listCollections(locationId);
 
-        const refreshedCollections = Array.isArray(refreshedCollectionsResponse?.collections)
-          ? refreshedCollectionsResponse.collections
-          : Array.isArray(refreshedCollectionsResponse?.data?.collections)
-            ? refreshedCollectionsResponse.data.collections
-            : [];
+        const refreshedCollections = Array.isArray(refreshedCollectionsResponse?.data?.data)
+          ? refreshedCollectionsResponse.data.data
+          : [];
 
         const createdCollection = refreshedCollections.find((collection) => {
           return String(collection?.name || "").trim().toLowerCase() ===
