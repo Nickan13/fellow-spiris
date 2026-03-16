@@ -1,6 +1,60 @@
 const ghlCollectionService = require("./ghlCollectionService");
 const spirisArticleLabelCollectionRepo = require("../db/repositories/spirisArticleLabelCollectionRepo");
 
+function normalizeName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function getCollectionsFromListResponse(response) {
+  if (Array.isArray(response?.data?.data)) {
+    return response.data.data;
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  if (Array.isArray(response?.collections)) {
+    return response.collections;
+  }
+
+  return [];
+}
+
+function extractCollectionIdFromCreateResponse(response) {
+  return (
+    response?._id ||
+    response?.id ||
+    response?.data?._id ||
+    response?.data?.id ||
+    response?.collection?._id ||
+    response?.collection?.id ||
+    response?.data?.collection?._id ||
+    response?.data?.collection?.id ||
+    null
+  );
+}
+
+function extractCollectionNameFromCreateResponse(response) {
+  return (
+    response?.name ||
+    response?.data?.name ||
+    response?.collection?.name ||
+    response?.data?.collection?.name ||
+    null
+  );
+}
+
+function findCollectionByName(collections, name) {
+  const wanted = normalizeName(name);
+
+  return collections.find((collection) => {
+    return normalizeName(collection?.name) === wanted;
+  }) || null;
+}
+
 async function ensureCollectionsForArticle({
   locationId,
   article,
@@ -36,9 +90,8 @@ async function ensureCollectionsForArticle({
   const existingCollectionsResponse =
     await ghlCollectionService.listCollections(locationId);
 
-    const existingCollections = Array.isArray(existingCollectionsResponse?.data?.data)
-    ? existingCollectionsResponse.data.data
-    : [];
+  const existingCollections =
+    getCollectionsFromListResponse(existingCollectionsResponse);
 
   const collectionIds = [];
   const results = [];
@@ -66,59 +119,49 @@ async function ensureCollectionsForArticle({
 
     if (existingMapping?.fellowCollectionId) {
       fellowCollectionId = existingMapping.fellowCollectionId;
-      fellowCollectionName = existingMapping.fellowCollectionName || spirisLabelName;
+      fellowCollectionName =
+        existingMapping.fellowCollectionName || spirisLabelName;
     } else {
-      const existingCollection = existingCollections.find((collection) => {
-        return String(collection?.name || "").trim().toLowerCase() ===
-          String(spirisLabelName).trim().toLowerCase();
-      });
+      const existingCollection =
+        findCollectionByName(existingCollections, spirisLabelName);
 
       if (existingCollection?._id || existingCollection?.id) {
         fellowCollectionId = existingCollection._id || existingCollection.id;
         fellowCollectionName = existingCollection.name || spirisLabelName;
-            } else {
-        await ghlCollectionService.createCollection(locationId, spirisLabelName);
-
-        const refreshedCollectionsResponse =
-          await ghlCollectionService.listCollections(locationId);
-
-        const refreshedCollections = Array.isArray(refreshedCollectionsResponse?.data?.data)
-          ? refreshedCollectionsResponse.data.data
-          : [];
-
-        const createdCollection = refreshedCollections.find((collection) => {
-          return String(collection?.name || "").trim().toLowerCase() ===
-            String(spirisLabelName).trim().toLowerCase();
-        });
+      } else {
+        const createdCollectionResponse =
+          await ghlCollectionService.createCollection(locationId, spirisLabelName);
 
         fellowCollectionId =
-          createdCollection?._id ||
-          createdCollection?.id ||
-          null;
+          extractCollectionIdFromCreateResponse(createdCollectionResponse);
 
         fellowCollectionName =
-          createdCollection?.name ||
+          extractCollectionNameFromCreateResponse(createdCollectionResponse) ||
           spirisLabelName;
 
         if (!fellowCollectionId) {
-  const created = await ghlCollectionService.createCollection(locationId, spirisLabelName);
+          const refreshedCollectionsResponse =
+            await ghlCollectionService.listCollections(locationId);
 
-  fellowCollectionId =
-    created?._id ||
-    created?.id ||
-    created?.collection?._id ||
-    created?.collection?.id ||
-    null;
+          const refreshedCollections =
+            getCollectionsFromListResponse(refreshedCollectionsResponse);
 
-  fellowCollectionName =
-    created?.name ||
-    created?.collection?.name ||
-    spirisLabelName;
+          const resolvedCollection =
+            findCollectionByName(refreshedCollections, spirisLabelName);
 
-  if (!fellowCollectionId) {
-    throw new Error(`Failed to create Fellow collection for label ${spirisLabelName}`);
-  }
-}
+          if (resolvedCollection?._id || resolvedCollection?.id) {
+            fellowCollectionId =
+              resolvedCollection._id || resolvedCollection.id;
+            fellowCollectionName =
+              resolvedCollection.name || spirisLabelName;
+          }
+        }
+
+        if (!fellowCollectionId) {
+          throw new Error(
+            `Failed to resolve Fellow collection for label ${spirisLabelName}`
+          );
+        }
       }
 
       await spirisArticleLabelCollectionRepo.upsertMapping({
