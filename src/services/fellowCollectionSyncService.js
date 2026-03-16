@@ -122,14 +122,6 @@ async function ensureCollectionsForArticle({
 
   const uniqueCollectionIds = [...new Set(collectionIds)];
 
-  if (uniqueCollectionIds.length > 0) {
-    await ghlCollectionService.assignProductToCollections(
-      locationId,
-      fellowProductId,
-      uniqueCollectionIds
-    );
-  }
-
   return {
     ok: true,
     locationId,

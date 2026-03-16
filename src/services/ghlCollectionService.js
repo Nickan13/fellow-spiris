@@ -21,6 +21,17 @@ async function getHeadersForLocation(locationId) {
   };
 }
 
+function toSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
 async function listCollections(locationId) {
   const headers = await getHeadersForLocation(locationId);
 
@@ -48,7 +59,8 @@ async function createCollection(locationId, name) {
   const payload = {
     altId: locationId,
     altType: "location",
-    name
+    name,
+    slug: toSlug(name)
   };
 
   const response = await axios.post(
@@ -62,41 +74,7 @@ async function createCollection(locationId, name) {
   return response.data;
 }
 
-async function assignProductToCollections(locationId, productId, collectionIds) {
-  if (!productId) {
-    throw new Error("productId is required");
-  }
-
-  if (!Array.isArray(collectionIds) || collectionIds.length === 0) {
-    throw new Error("collectionIds must be a non-empty array");
-  }
-
-  const headers = await getHeadersForLocation(locationId);
-
-  const payload = {
-    altId: locationId,
-    altType: "location",
-    products: [
-      {
-        _id: productId,
-        collectionIds
-      }
-    ]
-  };
-
-  const response = await axios.post(
-    `${env.ghlApiBase}/products/bulk-update/edit`,
-    payload,
-    {
-      headers
-    }
-  );
-
-  return response.data;
-}
-
 module.exports = {
   listCollections,
-  createCollection,
-  assignProductToCollections
+  createCollection
 };
