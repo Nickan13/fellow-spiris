@@ -1,6 +1,7 @@
 const articleStore = require("./articleStore");
 const ghlProductService = require("./ghlProductService");
 const fellowProductMappingRepo = require("../db/repositories/fellowProductMappingRepo");
+const fellowCollectionSyncService = require("./fellowCollectionSyncService");
 
 function isImportableSpirisArticle(article) {
   const raw = article?.raw || {};
@@ -135,11 +136,18 @@ async function importProductsForLocation({
         }
       );
 
-      await fellowProductMappingRepo.upsertMapping({
+    await fellowProductMappingRepo.upsertMapping({
         locationId,
         fellowProductId: productId,
         spirisArticleNumber
       });
+
+      const collectionSyncResult =
+        await fellowCollectionSyncService.ensureCollectionsForArticle({
+          locationId,
+          article,
+          fellowProductId: productId
+        });
 
       created += 1;
       results.push({
@@ -147,8 +155,10 @@ async function importProductsForLocation({
         spirisArticleNumber,
         articleName,
         fellowProductId: productId,
-        fellowPriceId: priceResult.price?._id || priceResult.price?.id || null
+        fellowPriceId: priceResult.price?._id || priceResult.price?.id || null,
+        fellowCollectionIds: collectionSyncResult.collectionIds || []
       });
+
     } catch (err) {
       failed += 1;
       results.push({
