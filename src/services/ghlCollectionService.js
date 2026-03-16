@@ -3,6 +3,10 @@ const env = require("../config/env");
 const platformAppTokenRepo = require("../db/repositories/platformAppTokenRepo");
 
 async function getHeadersForLocation(locationId) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
   const token = await platformAppTokenRepo.getTokenByLocationId(locationId);
 
   if (!token?.accessToken) {
@@ -18,10 +22,6 @@ async function getHeadersForLocation(locationId) {
 }
 
 async function listCollections(locationId) {
-  if (!locationId) {
-    throw new Error("locationId is required");
-  }
-
   const headers = await getHeadersForLocation(locationId);
 
   const response = await axios.get(
@@ -29,7 +29,8 @@ async function listCollections(locationId) {
     {
       headers,
       params: {
-        locationId
+        altId: locationId,
+        altType: "location"
       }
     }
   );
@@ -38,10 +39,6 @@ async function listCollections(locationId) {
 }
 
 async function createCollection(locationId, name) {
-  if (!locationId) {
-    throw new Error("locationId is required");
-  }
-
   if (!name) {
     throw new Error("name is required");
   }
@@ -49,7 +46,8 @@ async function createCollection(locationId, name) {
   const headers = await getHeadersForLocation(locationId);
 
   const payload = {
-    locationId,
+    altId: locationId,
+    altType: "location",
     name
   };
 
@@ -65,10 +63,6 @@ async function createCollection(locationId, name) {
 }
 
 async function assignProductToCollections(locationId, productId, collectionIds) {
-  if (!locationId) {
-    throw new Error("locationId is required");
-  }
-
   if (!productId) {
     throw new Error("productId is required");
   }
@@ -80,7 +74,8 @@ async function assignProductToCollections(locationId, productId, collectionIds) 
   const headers = await getHeadersForLocation(locationId);
 
   const payload = {
-    locationId,
+    altId: locationId,
+    altType: "location",
     products: [
       {
         _id: productId,
@@ -90,7 +85,7 @@ async function assignProductToCollections(locationId, productId, collectionIds) 
   };
 
   const response = await axios.post(
-    `${env.ghlApiBase}/products/bulk-update`,
+    `${env.ghlApiBase}/products/bulk-update/edit`,
     payload,
     {
       headers
