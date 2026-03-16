@@ -1,4 +1,5 @@
 const ghlCollectionService = require("./ghlCollectionService");
+const ghlProductService = require("./ghlProductService");
 const spirisArticleLabelCollectionRepo = require("../db/repositories/spirisArticleLabelCollectionRepo");
 
 function normalizeName(value) {
@@ -186,6 +187,22 @@ async function ensureCollectionsForArticle({
   }
 
   const uniqueCollectionIds = [...new Set(collectionIds)];
+
+  if (uniqueCollectionIds.length > 0) {
+    const existingProduct =
+      await ghlProductService.getProductById(locationId, fellowProductId);
+
+    await ghlProductService.updateProduct(locationId, fellowProductId, {
+      name: existingProduct?.name || article?.name || "Imported product",
+      description: existingProduct?.description || "",
+      productType: existingProduct?.productType || "DIGITAL",
+      availableInStore:
+        typeof existingProduct?.availableInStore === "boolean"
+          ? existingProduct.availableInStore
+          : true,
+      collectionIds: uniqueCollectionIds
+    });
+  }
 
   return {
     ok: true,
