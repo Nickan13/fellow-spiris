@@ -1,6 +1,7 @@
 const env = require("../config/env");
 const tokenService = require("./tokenService");
 const articleSyncService = require("./articleSyncService");
+const fellowProductImportService = require("./fellowProductImportService");
 
 const runningLocations = new Set();
 
@@ -21,16 +22,28 @@ async function syncSingleLocation(locationId) {
 
     const accessToken = await tokenService.getAccessTokenForLocation(locationId);
 
-    const result = await articleSyncService.syncArticlesForLocation({
+        const result = await articleSyncService.syncArticlesForLocation({
       locationId,
       accessToken,
       pageSize: 50
     });
 
+    const productImportResult =
+      await fellowProductImportService.importProductsForLocation({
+        locationId,
+        limit: 100,
+        articleFetchLimit: 5000
+      });
+
     console.log(
       `[article-auto-sync] completed sync for ${locationId}: ` +
-      `syncedCount=${result.syncedCount}, totalPages=${result.totalPages}`
+      `syncedCount=${result.syncedCount}, totalPages=${result.totalPages}, ` +
+      `productImportTotal=${productImportResult.total}, ` +
+      `productImportCreated=${productImportResult.created}, ` +
+      `productImportSkipped=${productImportResult.skippedAlreadyMapped}, ` +
+      `productImportFailed=${productImportResult.failed}`
     );
+    
   } catch (err) {
     console.error(
       `[article-auto-sync] failed sync for ${locationId}:`,
