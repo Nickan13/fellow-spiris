@@ -123,6 +123,30 @@ async function getMappingBySpirisArticleNumber(locationId, spirisArticleNumber) 
   };
 }
 
+async function deleteMappingBySpirisArticleNumber(locationId, spirisArticleNumber) {
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  if (!spirisArticleNumber) {
+    throw new Error("spirisArticleNumber is required");
+  }
+
+  await run(
+    `
+      DELETE FROM fellow_product_mappings
+      WHERE location_id = ?
+        AND spiris_article_number = ?
+    `,
+    [locationId, spirisArticleNumber]
+  );
+
+  return {
+    locationId,
+    spirisArticleNumber
+  };
+}
+
 async function listMappingsByLocation(locationId) {
   const rows = await all(
     `
@@ -167,6 +191,7 @@ module.exports = {
   upsertMapping,
   getMappingByProductId,
   getMappingBySpirisArticleNumber,
+  deleteMappingBySpirisArticleNumber,
   listMappingsByLocation,
   countByLocationId
 };

@@ -168,6 +168,13 @@ async function ensureMissingResolvedPricesForProduct({
   };
 }
 
+function isFellowProductNotFoundError(err) {
+  return (
+    err?.response?.status === 404 &&
+    err?.response?.data?.message === "Product not found"
+  );
+}
+
 async function importProductsForLocation({
   locationId,
   limit = 10,
@@ -235,32 +242,43 @@ async function importProductsForLocation({
         );
 
             if (existingMapping) {
-        const priceSyncResult =
-          await ensureMissingResolvedPricesForProduct({
-            locationId,
+        try {
+          const priceSyncResult =
+            await ensureMissingResolvedPricesForProduct({
+              locationId,
+              fellowProductId: existingMapping.fellowProductId,
+              article
+            });
+
+          const collectionSyncResult =
+            await fellowCollectionSyncService.ensureCollectionsForArticle({
+              locationId,
+              article,
+              fellowProductId: existingMapping.fellowProductId
+            });
+
+          skippedAlreadyMapped += 1;
+          results.push({
+            status: "skippedAlreadyMapped",
+            spirisArticleNumber,
+            articleName,
             fellowProductId: existingMapping.fellowProductId,
-            article
+            fellowCollectionIds: collectionSyncResult.collectionIds || [],
+            createdPrices: priceSyncResult.createdPrices,
+            skippedPrices: priceSyncResult.skippedPrices,
+            totalResolvedPrices: priceSyncResult.totalResolvedPrices
           });
+          continue;
+        } catch (err) {
+          if (!isFellowProductNotFoundError(err)) {
+            throw err;
+          }
 
-        const collectionSyncResult =
-          await fellowCollectionSyncService.ensureCollectionsForArticle({
+          await fellowProductMappingRepo.deleteMappingBySpirisArticleNumber(
             locationId,
-            article,
-            fellowProductId: existingMapping.fellowProductId
-          });
-
-        skippedAlreadyMapped += 1;
-        results.push({
-          status: "skippedAlreadyMapped",
-          spirisArticleNumber,
-          articleName,
-          fellowProductId: existingMapping.fellowProductId,
-          fellowCollectionIds: collectionSyncResult.collectionIds || [],
-          createdPrices: priceSyncResult.createdPrices,
-          skippedPrices: priceSyncResult.skippedPrices,
-          totalResolvedPrices: priceSyncResult.totalResolvedPrices
-        });
-        continue;
+            spirisArticleNumber
+          );
+        }
       }
 
     const productResult = await ghlProductService.createProduct(locationId, {
