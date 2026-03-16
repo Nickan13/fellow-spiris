@@ -809,7 +809,7 @@ document.getElementById("importProductsBtn").onclick = async function () {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          limit: 10
+          importAll: true
         })
       }
     );
@@ -1239,10 +1239,16 @@ router.post("/integration/fellow/test-create-product/:locationId", async (req, r
 router.post("/integration/fellow/import-products/:locationId", express.json(), async (req, res) => {
   try {
     const { locationId } = req.params;
+    const importAll = req.body?.importAll === true;
     const requestedLimit = Number(req.body?.limit ?? 10);
-    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
-      ? Math.min(requestedLimit, 100)
-      : 10;
+
+    const limit = importAll
+      ? null
+      : Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 100)
+        : 10;
+
+    const articleFetchLimit = importAll ? 5000 : 1000;
 
     if (!locationId) {
       return res.status(400).json({
@@ -1254,7 +1260,7 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
     const result = await fellowProductImportService.importProductsForLocation({
       locationId,
       limit,
-      articleFetchLimit: 1000
+      articleFetchLimit
     });
 
     return res.json({

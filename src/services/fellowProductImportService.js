@@ -184,9 +184,12 @@ async function importProductsForLocation({
     throw new Error("locationId is required");
   }
 
-  const normalizedLimit = Number.isFinite(Number(limit)) && Number(limit) > 0
-    ? Math.min(Number(limit), 100)
-    : 10;
+  const normalizedLimit =
+    limit == null
+      ? null
+      : Number.isFinite(Number(limit)) && Number(limit) > 0
+      ? Math.min(Number(limit), 100)
+      : 10;
 
   const normalizedArticleFetchLimit =
     Number.isFinite(Number(articleFetchLimit)) && Number(articleFetchLimit) > 0
@@ -198,11 +201,14 @@ async function importProductsForLocation({
     normalizedArticleFetchLimit
   );
 
-  const importableArticles = (articles || [])
-    .filter((article) => {
-      return isImportableSpirisArticle(article);
-    })
-    .slice(0, normalizedLimit);
+    const filteredArticles = (articles || []).filter((article) => {
+    return isImportableSpirisArticle(article);
+  });
+
+  const importableArticles =
+    normalizedLimit == null
+      ? filteredArticles
+      : filteredArticles.slice(0, normalizedLimit);
 
   if (importableArticles.length === 0) {
     return {
