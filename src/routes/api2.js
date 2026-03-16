@@ -13,8 +13,6 @@ const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappin
 const articleStore = require("../services/articleStore");
 const ghlProductService = require("../services/ghlProductService");
 const fellowProductImportService = require("../services/fellowProductImportService");
-const spirisService = require("../services/spirisService");
-const spirisPriceListService = require("../services/spirisPriceListService");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -1299,120 +1297,6 @@ router.get("/integration/fellow/collections/:locationId", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "Failed to fetch Fellow collections",
-      details: err.response?.data || err.message
-    });
-  }
-});
-
-router.get("/integration/debug/spiris/sales-price-lists/:locationId", async (req, res) => {
-  try {
-    const { locationId } = req.params;
-
-    if (!locationId) {
-      return res.status(400).json({
-        ok: false,
-        error: "locationId is required"
-      });
-    }
-
-    const accessToken = await tokenService.getAccessTokenForLocation(locationId);
-
-    const salesPriceLists = await spirisService.getSalesPriceLists(accessToken);
-    const salesPriceListPrices = await spirisService.getSalesPriceListPrices(accessToken);
-    const articles = await articleStore.listArticlesByLocation(locationId, 5);
-
-    return res.json({
-      ok: true,
-      locationId,
-      salesPriceLists,
-      salesPriceListPrices,
-      sampleArticles: articles.map((article) => ({
-        spirisArticleId: article.spirisArticleId,
-        articleNumber: article.articleNumber,
-        name: article.name,
-        unitPrice: article.unitPrice
-      }))
-    });
-  } catch (err) {
-    console.error(
-      "debug spiris sales price lists error:",
-      err.response?.data || err.message
-    );
-
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to fetch Spiris sales price lists debug data",
-      details: err.response?.data || err.message
-    });
-  }
-});
-
-router.get("/integration/debug/spiris/article-prices/:locationId/:articleNumber", async (req, res) => {
-  try {
-    const { locationId, articleNumber } = req.params;
-
-    if (!locationId) {
-      return res.status(400).json({
-        ok: false,
-        error: "locationId is required"
-      });
-    }
-
-    if (!articleNumber) {
-      return res.status(400).json({
-        ok: false,
-        error: "articleNumber is required"
-      });
-    }
-
-    const article = await articleStore.getArticleByNumber(locationId, articleNumber);
-
-    if (!article) {
-      return res.status(404).json({
-        ok: false,
-        error: "Article not found in local store",
-        locationId,
-        articleNumber
-      });
-    }
-
-    if (!article.spirisArticleId) {
-      return res.status(400).json({
-        ok: false,
-        error: "Article is missing spirisArticleId",
-        locationId,
-        articleNumber
-      });
-    }
-
-    const accessToken = await tokenService.getAccessTokenForLocation(locationId);
-
-    const resolved =
-      await spirisPriceListService.getResolvedPricesForArticle({
-        accessToken,
-        articleId: article.spirisArticleId
-      });
-
-    return res.json({
-      ok: true,
-      locationId,
-      article: {
-        articleNumber: article.articleNumber,
-        spirisArticleId: article.spirisArticleId,
-        name: article.name,
-        unitPrice: article.unitPrice
-      },
-      prices: resolved.prices
-    });
-  } catch (err) {
-    console.error(
-      "debug spiris article prices error:",
-      err.response?.data || err.message
-    );
-
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to resolve article prices from Spiris",
       details: err.response?.data || err.message
     });
   }
