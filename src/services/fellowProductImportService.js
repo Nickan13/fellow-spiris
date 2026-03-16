@@ -21,7 +21,7 @@ function isImportableSpirisArticle(article) {
 }
 
 function mapSpirisArticleToFellowProductType(article) {
-  return article?.raw?.IsStock === true ? "PHYSICAL" : "SERVICE";
+  return article?.raw?.IsStock === true ? "PHYSICAL" : "DIGITAL";
 }
 
 async function importProductsForLocation({
