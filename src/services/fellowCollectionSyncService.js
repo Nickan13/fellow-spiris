@@ -101,8 +101,24 @@ async function ensureCollectionsForArticle({
           spirisLabelName;
 
         if (!fellowCollectionId) {
-          throw new Error(`Failed to resolve Fellow collection for label ${spirisLabelName}`);
-        }
+  const created = await ghlCollectionService.createCollection(locationId, spirisLabelName);
+
+  fellowCollectionId =
+    created?._id ||
+    created?.id ||
+    created?.collection?._id ||
+    created?.collection?.id ||
+    null;
+
+  fellowCollectionName =
+    created?.name ||
+    created?.collection?.name ||
+    spirisLabelName;
+
+  if (!fellowCollectionId) {
+    throw new Error(`Failed to create Fellow collection for label ${spirisLabelName}`);
+  }
+}
       }
 
       await spirisArticleLabelCollectionRepo.upsertMapping({
