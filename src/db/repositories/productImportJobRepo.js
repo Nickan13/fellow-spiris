@@ -235,10 +235,53 @@ async function markAsFailed(id, errorText) {
   return getById(id);
 }
 
+async function getNextPendingJob() {
+  const row = await get(
+    `
+      SELECT
+        id,
+        location_id,
+        status,
+        import_all,
+        requested_limit,
+        article_fetch_limit,
+        result_json,
+        last_error_text,
+        locked_at,
+        processed_at,
+        created_at,
+        updated_at
+      FROM product_import_jobs
+      WHERE status = 'pending'
+      ORDER BY id ASC
+      LIMIT 1
+    `
+  );
+
+  return mapRow(row);
+}
+
+async function hasRunningJobForLocation(locationId) {
+  const row = await get(
+    `
+      SELECT id
+      FROM product_import_jobs
+      WHERE location_id = ?
+        AND status = 'processing'
+      LIMIT 1
+    `,
+    [locationId]
+  );
+
+  return !!row;
+}
+
 module.exports = {
   createJob,
   getById,
   getLatestByLocationId,
+  getNextPendingJob,
+  hasRunningJobForLocation,
   markAsProcessing,
   markAsCompleted,
   markAsFailed

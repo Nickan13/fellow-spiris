@@ -13,7 +13,6 @@ const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappin
 const articleStore = require("../services/articleStore");
 const ghlProductService = require("../services/ghlProductService");
 const fellowProductImportService = require("../services/fellowProductImportService");
-const productImportJobService = require("../services/productImportJobService");
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -294,6 +293,75 @@ router.get("/integration/connect-spiris/:locationId", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "Failed to start Spiris connection",
+      details: err.message
+    });
+  }
+});
+
+router.get("/integration/fellow/product-import-status/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const productImportJobRepo = require("../db/repositories/productImportJobRepo");
+
+    const job =
+      await productImportJobRepo.getLatestByLocationId(locationId);
+
+    return res.json({
+      ok: true,
+      job
+    });
+
+  } catch (err) {
+    console.error(
+      "product import status error:",
+      err.message
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch product import job status",
+      details: err.message
+    });
+  }
+});
+
+router.get("/integration/fellow/product-import-job/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    const productImportJobRepo = require("../db/repositories/productImportJobRepo");
+
+    const job = await productImportJobRepo.getById(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        ok: false,
+        error: "Job not found"
+      });
+    }
+
+    return res.json({
+      ok: true,
+      job
+    });
+
+  } catch (err) {
+    console.error(
+      "product import job error:",
+      err.message
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch product import job",
       details: err.message
     });
   }
@@ -1258,40 +1326,47 @@ router.post("/integration/fellow/import-products/:locationId", express.json(), a
       });
     }
 
-    const jobResult = await productImportJobService.runProductImportJob({
+    const productImportJobRepo = require("../db/repositories/productImportJobRepo");
+
+    const runningJob =
+      await productImportJobRepo.hasRunningJobForLocation(locationId);
+
+    if (runningJob) {
+      return res.status(409).json({
+        ok: false,
+        error: "A product import job is already running for this location"
+      });
+    }
+
+    const job = await productImportJobRepo.createJob({
       locationId,
       importAll,
       requestedLimit: limit,
       articleFetchLimit
-  });
-
-const result = jobResult.result || {
-  locationId,
-  total: 0,
-  created: 0,
-  skippedAlreadyMapped: 0,
-  failed: 0,
-  results: []
-};
+    });
 
     return res.json({
       ok: true,
-      locationId: result.locationId,
-      total: result.total,
-      created: result.created,
-      skippedAlreadyMapped: result.skippedAlreadyMapped,
-      failed: result.failed,
-      results: result.results
+      queued: true,
+      job: {
+        id: job.id,
+        locationId: job.locationId,
+        status: job.status,
+        importAll: job.importAll,
+        requestedLimit: job.requestedLimit,
+        articleFetchLimit: job.articleFetchLimit,
+        createdAt: job.createdAt
+      }
     });
   } catch (err) {
     console.error(
-      "import fellow products error:",
+      "queue fellow product import error:",
       err.response?.data || err.message
     );
 
     return res.status(500).json({
       ok: false,
-      error: "Failed to import Spiris articles as Fellow products",
+      error: "Failed to queue Spiris product import job",
       details: err.response?.data || err.message
     });
   }
