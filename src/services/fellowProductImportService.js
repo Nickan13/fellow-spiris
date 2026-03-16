@@ -130,7 +130,8 @@ async function importProductsForLocation({
         {
           name: "Standardpris",
           currency: "SEK",
-          amount: article.unitPrice ?? 0
+          amount: article.unitPrice ?? 0,
+          isDigitalProduct: mapSpirisArticleToFellowProductType(article) === "DIGITAL"
         }
       );
 
