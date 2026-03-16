@@ -392,72 +392,190 @@ router.get("/app/spiris", async (req, res) => {
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Spiris Integration</title>
 
 <style>
+:root {
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --card-muted: #f9fafb;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --text: #111827;
+  --muted: #6b7280;
+  --primary: #82358b;
+  --primary-hover: #6f2d78;
+  --secondary: #eef2ff;
+  --success-bg: #e8f7ee;
+  --success-text: #166534;
+  --danger-bg: #fef2f2;
+  --danger-text: #b91c1c;
+  --warning-bg: #fff7ed;
+  --warning-text: #9a3412;
+  --info-bg: #eff6ff;
+  --info-text: #1d4ed8;
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 body {
-  font-family: Inter, sans-serif;
-  padding: 30px;
-  color: #1f2937;
+  padding: 28px;
+}
+
+.app-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.hero {
+  background: linear-gradient(135deg, #82358b 0%, #5b2b91 100%);
+  color: white;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  margin-bottom: 22px;
+}
+
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.hero-brand {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.hero-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.hero h1 {
+  margin: 0 0 6px 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.hero-subtitle {
+  margin: 0;
+  color: rgba(255,255,255,0.86);
+  font-size: 15px;
+  max-width: 720px;
+  line-height: 1.5;
+}
+
+.hero-status {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.hero-status .pill {
+  background: rgba(255,255,255,0.14);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.summary-card {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.78);
+  margin-bottom: 8px;
+}
+
+.summary-value {
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
+  color: white;
+}
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+.stack {
+  display: grid;
+  gap: 22px;
 }
 
 .card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 24px;
-  max-width: 760px;
-  background: #fff;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
-h2 {
-  margin-top: 0;
-  margin-bottom: 24px;
+.card-header {
+  padding: 20px 22px 14px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.section {
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
+.card-title-wrap h2,
+.card-title-wrap h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
 }
 
-.section:first-of-type {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
-
-.section h3 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
-}
-
-.help-text {
-  margin: 0 0 14px 0;
-  color: #4b5563;
+.card-subtitle {
+  margin: 6px 0 0 0;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
 }
 
-.status {
-  margin: 10px 0;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-connected {
-  background: #e6f6ec;
-  color: #0f7a39;
-}
-
-.status-disconnected {
-  background: #fdecec;
-  color: #b00020;
+.card-body {
+  padding: 20px 22px 22px 22px;
 }
 
 .actions-row {
@@ -468,84 +586,193 @@ h2 {
 }
 
 button {
-  padding: 10px 16px;
-  font-size: 14px;
-  border-radius: 6px;
+  appearance: none;
   border: none;
-  background: #82358b;
-  color: white;
   cursor: pointer;
+  border-radius: 12px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: 0.18s ease;
 }
 
-button:hover {
-  background: #6f2d78;
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+button.primary {
+  background: var(--primary);
+  color: white;
+}
+
+button.primary:hover {
+  background: var(--primary-hover);
 }
 
 button.secondary {
-  background: #8597b3;
+  background: #eef2f7;
+  color: #1f2937;
 }
 
-button.disabled {
-  background: #d1d5db;
-  color: #6b7280;
-  cursor: not-allowed;
+button.secondary:hover {
+  background: #e5e7eb;
+}
+
+button.ghost-danger {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+button.ghost-danger:hover {
+  background: #ffe4e6;
 }
 
 select {
-  padding: 10px 40px 10px 14px;
-  font-size: 14px;
-  border-radius: 6px;
-  border: none;
-  background-color: #82358b;
-  color: white;
-  cursor: pointer;
-
   appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  border: 1px solid var(--border-strong);
+  background: white;
+  color: var(--text);
+  border-radius: 12px;
+  padding: 11px 42px 11px 14px;
+  font-size: 14px;
+  min-width: 180px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 12px;
+  background-position: right 14px center;
 }
 
-select option {
-  background: white;
-  color: black;
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.pill.success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: #bbf7d0;
+}
+
+.pill.danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: #fecaca;
+}
+
+.pill.warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: #fed7aa;
+}
+
+.pill.info {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: #bfdbfe;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-box {
+  border: 1px solid var(--border);
+  background: var(--card-muted);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.metric-label {
+  margin: 0 0 8px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metric-value {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.info-list {
+  display: grid;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.info-row:first-child {
+  padding-top: 0;
+}
+
+.info-label {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
 }
 
 .notice {
-  margin-top: 16px;
-  color: #1f2937;
+  margin-top: 0;
+  color: var(--text);
   font-size: 14px;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 12px;
-  min-height: 20px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  min-height: 48px;
+  line-height: 1.5;
 }
 
 .error {
-  color: #b00020;
-  margin-top: 12px;
+  color: var(--danger-text);
   font-size: 14px;
-  background: #fef2f2;
+  background: var(--danger-bg);
   border: 1px solid #fecaca;
-  border-radius: 6px;
-  padding: 12px;
-  min-height: 20px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  min-height: 48px;
+  line-height: 1.5;
 }
 
-#importDetails {
-  margin-top: 16px;
+.panel-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .import-details-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 12px;
+  background: #fcfcfd;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
 }
 
 .import-details-card h4 {
@@ -561,89 +788,279 @@ select option {
 .import-details-card li {
   margin-bottom: 8px;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
+.helper-text {
+  margin: 0 0 16px 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.section-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 1080px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 16px;
+  }
+
+  .hero {
+    padding: 20px;
+  }
+
+  .hero h1 {
+    font-size: 24px;
+  }
+
+  .summary-grid,
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .card-header,
+  .card-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .info-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .info-value {
+    text-align: left;
+  }
+}
 </style>
 </head>
 
 <body>
 
-<div class="card">
+<div class="app-shell">
 
-  <h2>Spiris Integration</h2>
+  <section class="hero">
+    <div class="hero-top">
+      <div class="hero-brand">
+        <div class="hero-logo">S</div>
+        <div>
+          <h1>Spiris Integration</h1>
+          <p class="hero-subtitle">
+            Koppla Spiris till Fellow, synka kunder och produkter, hantera flera prislistor och styr hur fakturor skickas vidare.
+          </p>
+        </div>
+      </div>
 
-  <div id="status">Laddar integrationsstatus...</div>
-
-  <div class="section">
-    <h3>Koppla Spiris till Fellow</h3>
-    <p class="help-text">
-      Koppla ditt Spiris-konto till Fellow så att integrationen kan hämta kunder, synka produkter och skicka fakturor.
-    </p>
-    <p class="help-text" id="connectHelpText">
-      När kopplingen är klar uppdateras sidan automatiskt.
-    </p>
-    <div class="actions-row">
-      <button id="connectBtn">Koppla till Spiris</button>
-      <button class="secondary" id="disconnectBtn" style="display:none;">Koppla bort Spiris</button>
+      <div class="hero-status">
+        <span class="pill" id="heroAppInstalledPill">Appstatus laddas...</span>
+        <span class="pill" id="heroSpirisPill">Spiris-status laddas...</span>
+      </div>
     </div>
-  </div>
 
-  <div class="section">
-    <h3>Kunder</h3>
-    <p class="help-text">
-      Importera kunder från Spiris till detta subaccount i Fellow. Befintliga mappingar återanvänds och nya kontakter skapas vid behov.
-    </p>
-    <p class="help-text">
-      Funktionen hämtar kunder från Spiris och kopplar dem till rätt kontakter i Fellow.
-    </p>
-    <div class="actions-row">
-      <button class="secondary" id="importCustomersBtn">Importera kunder</button>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-label">Synkade kunder</div>
+        <div class="summary-value" id="summaryCustomers">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Synkade produkter</div>
+        <div class="summary-value" id="summaryProducts">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Skickade fakturor</div>
+        <div class="summary-value" id="summaryInvoices">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Kräver åtgärd</div>
+        <div class="summary-value" id="summaryRequiresAction">-</div>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="section">
-    <h3>Fakturor</h3>
-    <p class="help-text">
-      Fakturor som skapas i Fellow går automatiskt över till Spiris när ni <b>skickar</b> fakturan. Om ni av någon anledning behöver skicka samma faktura en gång till händer ingenting i Spiris (inga dubletter).
-    </p>
-    <p class="help-text">
-      Välj om fakturor från Fellow ska skickas till Spiris som utkast eller om de ska bokföras direkt. Om du väljer att skapa fakturautkast behöver du logga in i Spiris och hantera den för att den ska bokföras. Om du väjer Bokför direkt behöver du inte hantera fakturan mer, utan den bokförs direkt i Spiris.
-    </p>
-    <p class="help-text">
-      Ändring av fakturaläge gäller nya fakturor. Redan skickade fakturor påverkas inte.
-    </p>
-    <div class="actions-row">
-      <select id="invoiceModeSelect">
-        <option value="draft">Utkast</option>
-        <option value="booked">Bokför direkt</option>
-      </select>
-      <button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
+  <div class="layout-grid">
+
+    <div class="stack">
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h2>Översikt</h2>
+            <p class="card-subtitle">
+              Här ser du aktuell status för integrationen, kopplingen till Spiris och de viktigaste nyckeltalen.
+            </p>
+          </div>
+          <span class="pill info" id="invoiceModePill">Fakturaläge laddas...</span>
+        </div>
+        <div class="card-body">
+          <div class="metrics">
+            <div class="metric-box">
+              <p class="metric-label">Retry-jobb</p>
+              <p class="metric-value" id="metricRetryJobs">-</p>
+            </div>
+            <div class="metric-box">
+              <p class="metric-label">Misslyckade jobb</p>
+              <p class="metric-value" id="metricFailedJobs">-</p>
+            </div>
+          </div>
+
+          <div class="info-list" style="margin-top:16px;">
+            <div class="info-row">
+              <div class="info-label">App installerad</div>
+              <div class="info-value" id="infoAppInstalled">-</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Spiris anslutet</div>
+              <div class="info-value" id="infoSpirisConnected">-</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Aktuellt fakturaläge</div>
+              <div class="info-value" id="infoInvoiceMode">-</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h2>Koppling till Spiris</h2>
+            <p class="card-subtitle">
+              Hantera kopplingen mellan detta subaccount och Spiris.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="helper-text" id="connectHelpText">
+            När kopplingen är klar uppdateras sidan automatiskt.
+          </p>
+          <div class="actions-row">
+            <button class="primary" id="connectBtn">Koppla till Spiris</button>
+            <button class="ghost-danger" id="disconnectBtn" style="display:none;">Koppla bort Spiris</button>
+          </div>
+          <p class="section-note">
+            Kopplingen används för kundimport, produktsynk, prislistor och fakturering.
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h2>Produkter och prislistor</h2>
+            <p class="card-subtitle">
+              Importera artiklar från Spiris, skapa eller reparera produkter i Fellow och synka flera priser på samma produkt.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="helper-text">
+            Importen återanvänder befintliga mappingar, skapar saknade priser och kan självläka om en Fellow-produkt tidigare tagits bort.
+          </p>
+          <div class="actions-row">
+            <button class="primary" id="importProductsBtn">Importera produkter</button>
+          </div>
+          <p class="section-note">
+            0-priser importeras också, så att Fellow speglar Spiris så exakt som möjligt.
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h2>Kunder</h2>
+            <p class="card-subtitle">
+              Importera kunder från Spiris till detta subaccount i Fellow.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="helper-text">
+            Befintliga mappingar återanvänds och nya kontakter skapas vid behov.
+          </p>
+          <div class="actions-row">
+            <button class="secondary" id="importCustomersBtn">Importera kunder</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h2>Fakturor</h2>
+            <p class="card-subtitle">
+              Styr om nya fakturor från Fellow ska skickas till Spiris som utkast eller bokföras direkt.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="helper-text">
+            Fakturor skickas vidare när ni <b>skickar</b> dem i Fellow. Redan skickade fakturor påverkas inte av ändrat fakturaläge.
+          </p>
+          <div class="actions-row">
+            <select id="invoiceModeSelect">
+              <option value="draft">Utkast</option>
+              <option value="booked">Bokför direkt</option>
+            </select>
+            <button class="secondary" id="saveInvoiceModeBtn">Spara fakturaläge</button>
+          </div>
+        </div>
+      </section>
+
     </div>
-  </div>
 
-  <div class="section">
-    <h3>Produkter</h3>
-    <p class="help-text">
-      Importera artiklar från Spiris och skapa dem som produkter i Fellow med pris och lokal mapping.
-    </p>
-    <p class="help-text">
-      Importen hoppar över artiklar som redan är mappade, så samma produkter skapas inte två gånger.
-    </p>
-    <div class="actions-row">
-      <button class="secondary" id="importProductsBtn">Importera produkter</button>
+    <div class="stack">
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h3>Status och meddelanden</h3>
+            <p class="card-subtitle">
+              Här visas resultat från import, koppling och ändringar.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="panel-stack">
+            <div class="notice" id="message"></div>
+            <div class="error" id="error"></div>
+            <div id="importDetails"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <h3>Fakturor som kräver åtgärd</h3>
+            <p class="card-subtitle">
+              Problem som behöver hanteras manuellt för att fakturor ska komma vidare.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="requiresActionDetails"></div>
+        </div>
+      </section>
+
     </div>
-  </div>
 
-    <div class="section">
-    <h3>Status och meddelanden</h3>
-    <p class="help-text">
-      Här visas resultat från import, koppling och ändringar i fakturaläge.
-    </p>
-    <div class="notice" id="message"></div>
-    <div class="error" id="error"></div>
-    <div id="importDetails"></div>
-    <div id="requiresActionDetails"></div>
   </div>
 
 </div>
@@ -675,6 +1092,13 @@ function formatInvoiceMode(mode) {
   return mode || "";
 }
 
+function getPillClass(type) {
+  if (type === "success") return "pill success";
+  if (type === "danger") return "pill danger";
+  if (type === "warning") return "pill warning";
+  return "pill info";
+}
+
 function updateConnectButton(isConnected) {
   const connectBtn = document.getElementById("connectBtn");
   const disconnectBtn = document.getElementById("disconnectBtn");
@@ -682,10 +1106,10 @@ function updateConnectButton(isConnected) {
 
   if (isConnected) {
     connectBtn.style.display = "none";
-    disconnectBtn.style.display = "inline-block";
-    help.textContent = "Spiris är anslutet för. Klicka bara på knappen om du vill koppla bort integrationen.";
+    disconnectBtn.style.display = "inline-flex";
+    help.textContent = "Spiris är anslutet för detta subaccount. Du kan koppla bort integrationen här om det behövs.";
   } else {
-    connectBtn.style.display = "inline-block";
+    connectBtn.style.display = "inline-flex";
     disconnectBtn.style.display = "none";
     help.textContent = "När kopplingen är klar uppdateras sidan automatiskt.";
   }
@@ -705,21 +1129,27 @@ async function loadStatus() {
 
   const s = data.status;
 
-  const spirisBadge = s.spirisConnected
-  ? '<span class="status-badge status-connected">Ansluten</span>'
-  : '<span class="status-badge status-disconnected">Ej ansluten</span>';
+  document.getElementById("summaryCustomers").textContent = s.customerMappingsCount;
+  document.getElementById("summaryProducts").textContent = s.productMappingsCount;
+  document.getElementById("summaryInvoices").textContent = s.invoiceMappingsCount;
+  document.getElementById("summaryRequiresAction").textContent = s.requiresActionCount;
 
-  document.getElementById("status").innerHTML = \`
-    <div class="status"><b>App installerad:</b> \${s.appInstalled ? "Ja" : "Nej"}</div>
-    <div class="status"><b>Spiris:</b> \${spirisBadge}</div>
-    <div class="status"><b>Fakturaläge:</b> \${formatInvoiceMode(s.spirisInvoiceMode)}</div>
-    <div class="status"><b>Synkade kunder:</b> \${s.customerMappingsCount}</div>
-    <div class="status"><b>Synkade produkter:</b> \${s.productMappingsCount}</div>
-    <div class="status"><b>Skickade fakturor:</b> \${s.invoiceMappingsCount}</div>
-    <div class="status"><b>Retry-jobb:</b> \${s.retryJobsCount}</div>
-    <div class="status"><b>Kräver åtgärd:</b> \${s.requiresActionCount}</div>
-    <div class="status"><b>Misslyckade jobb:</b> \${s.failedJobsCount}</div>
-  \`;
+  document.getElementById("metricRetryJobs").textContent = s.retryJobsCount;
+  document.getElementById("metricFailedJobs").textContent = s.failedJobsCount;
+
+  document.getElementById("infoAppInstalled").textContent = s.appInstalled ? "Ja" : "Nej";
+  document.getElementById("infoSpirisConnected").textContent = s.spirisConnected ? "Ja" : "Nej";
+  document.getElementById("infoInvoiceMode").textContent = formatInvoiceMode(s.spirisInvoiceMode);
+
+  document.getElementById("invoiceModePill").textContent = "Fakturaläge: " + formatInvoiceMode(s.spirisInvoiceMode);
+
+  const heroAppInstalledPill = document.getElementById("heroAppInstalledPill");
+  heroAppInstalledPill.className = s.appInstalled ? getPillClass("success") : getPillClass("danger");
+  heroAppInstalledPill.textContent = s.appInstalled ? "App installerad" : "App ej installerad";
+
+  const heroSpirisPill = document.getElementById("heroSpirisPill");
+  heroSpirisPill.className = s.spirisConnected ? getPillClass("success") : getPillClass("warning");
+  heroSpirisPill.textContent = s.spirisConnected ? "Spiris anslutet" : "Spiris ej anslutet";
 
   document.getElementById("invoiceModeSelect").value = s.spirisInvoiceMode;
   updateConnectButton(s.spirisConnected);
@@ -739,7 +1169,6 @@ async function loadRequiresActionJobs() {
   if (!data.jobs || data.jobs.length === 0) {
     setRequiresActionDetails(
       '<div class="import-details-card">' +
-      '<h4>Fakturor som kräver åtgärd</h4>' +
       '<div>Inga fakturor kräver åtgärd just nu.</div>' +
       '</div>'
     );
@@ -778,7 +1207,6 @@ async function loadRequiresActionJobs() {
 
   setRequiresActionDetails(
     '<div class="import-details-card">' +
-    '<h4>Fakturor som kräver åtgärd</h4>' +
     '<ul>' + items + '</ul>' +
     '</div>'
   );
@@ -992,7 +1420,7 @@ document.getElementById("importCustomersBtn").onclick = async function () {
         pageSize: 10,
         maxPages: 1
       })
-    });
+    );
 
     const rawText = await res.text();
 
@@ -1051,6 +1479,10 @@ document.getElementById("importCustomersBtn").onclick = async function () {
     }
   } catch (err) {
     setError(err.message || "Customer import failed");
+  } finally {
+    const button = document.getElementById("importCustomersBtn");
+    button.disabled = false;
+    button.textContent = "Importera kunder";
   }
 };
 
@@ -1105,6 +1537,7 @@ Promise.all([
 </body>
 </html>
     `);
+
   } catch (err) {
     console.error("app spiris page error:", err.message);
     return res.status(500).send("Failed to load Spiris app page");
