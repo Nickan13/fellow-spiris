@@ -8,7 +8,11 @@ const api2Routes = require("./routes/api2");
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 app.use("/health", healthRoute);
 app.use("/oauth", oauthRoutes);

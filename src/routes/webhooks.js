@@ -4,6 +4,7 @@ const router = express.Router();
 const platformWebhookLogRepo = require("../db/repositories/platformWebhookLogRepo");
 const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
 const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
+const crypto = require("crypto");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -350,6 +351,140 @@ router.post("/invoice/create-draft", async (req, res) => {
       ok: false,
       error: "Internal server error"
     });
+  }
+});
+
+//Ny kod 2026-04-01 för att synka nya kontakter i Sjöbergs Godas Shopify till Sjöbergs Godas Fellow
+async function getShopifyCustomerWithBirthday(customerId) {
+  const query = `
+    query GetCustomer($id: ID!) {
+      customer(id: $id) {
+        email
+        firstName
+        lastName
+        metafield(namespace: "facts", key: "birth_date") {
+          value
+        }
+      }
+    }
+  `;
+
+  const res = await fetch("https://e10270-9c.myshopify.com/admin/api/2026-01/graphql.json", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
+    },
+    body: JSON.stringify({
+      query,
+      variables: {
+        id: `gid://shopify/Customer/${customerId}`
+      }
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(`Shopify HTTP ${res.status}: ${JSON.stringify(data)}`);
+  }
+
+  if (data.errors) {
+    throw new Error(`Shopify GraphQL errors: ${JSON.stringify(data.errors)}`);
+  }
+
+  return data?.data?.customer || null;
+}
+
+async function upsertBirthdayToFellow(customer) {
+  if (!customer?.email) return;
+
+  const birthDate = customer?.metafield?.value || "";
+
+  const payload = {
+    locationId: "FZK53zttFssaKFsCr9jl",
+    email: customer.email,
+    firstName: customer.firstName || "",
+    lastName: customer.lastName || ""
+  };
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    payload.dateOfBirth = birthDate;
+  }
+
+  const res = await fetch("https://services.leadconnectorhq.com/contacts/upsert", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.HL_TOKEN}`,
+      "Version": "2021-07-28",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(`HighLevel HTTP ${res.status}: ${JSON.stringify(data)}`);
+  }
+
+  return data;
+}
+
+function verifyShopifyWebhook(req) {
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const hmacHeader = req.get("X-Shopify-Hmac-Sha256");
+
+  if (!secret) {
+    throw new Error("Missing SHOPIFY_WEBHOOK_SECRET");
+  }
+
+  if (!hmacHeader) {
+    return false;
+  }
+
+  if (!req.rawBody) {
+    throw new Error("Missing rawBody for Shopify webhook verification");
+  }
+
+  const digest = crypto
+    .createHmac("sha256", secret)
+    .update(req.rawBody)
+    .digest("base64");
+
+  const safeHeader = Buffer.from(hmacHeader, "utf8");
+  const safeDigest = Buffer.from(digest, "utf8");
+
+  if (safeHeader.length !== safeDigest.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(safeHeader, safeDigest);
+}
+
+router.post("/shopify/customer-webhook", async (req, res) => {
+  try {
+    const isValid = verifyShopifyWebhook(req);
+
+    if (!isValid) {
+      console.error("[shopify customer webhook] invalid HMAC");
+      return res.status(401).send("invalid signature");
+    }
+
+    const shopifyCustomerId = req.body?.id;
+
+    if (!shopifyCustomerId) {
+      return res.status(200).send("ok");
+    }
+
+    const customer = await getShopifyCustomerWithBirthday(shopifyCustomerId);
+    await upsertBirthdayToFellow(customer);
+
+    console.log(`[shopify customer webhook] synced customer ${shopifyCustomerId}`);
+    return res.status(200).send("ok");
+  } catch (err) {
+    console.error("[shopify customer webhook] error:", err);
+    return res.status(500).send("error");
   }
 });
 
