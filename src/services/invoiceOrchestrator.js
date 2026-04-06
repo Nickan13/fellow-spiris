@@ -75,33 +75,28 @@ async function resolveSpirisCustomerStrict({
   accessToken,
   customerType,
   orgNumber,
-  email,
-  createPayload
+  email
 }) {
-  const customer = await resolveSpirisCustomer({
+  const customer = await customerResolver.resolveExistingCustomer({
     accessToken,
     customerType,
     orgNumber,
-    email,
-    createPayload
+    email
   });
 
-  if (customerType !== "b2b") {
-    return customer;
+  if (!customer) {
+    throw new Error(
+      `No existing Spiris customer found for customerType=${customerType} orgNumber=${orgNumber || ""} email=${email || ""}`
+    );
   }
 
-  if (!customer?.IsPrivatePerson) {
-    return customer;
+  if (customerType === "b2b" && customer.IsPrivatePerson) {
+    throw new Error(
+      `Existing Spiris customer ${customer.Id} is private person, cannot use for b2b`
+    );
   }
 
-  if (!createPayload) {
-    throw new Error("Resolved private person for b2b customer, but no createPayload provided");
-  }
-
-  return spirisService.createCustomer(accessToken, {
-    ...createPayload,
-    IsPrivatePerson: false
-  });
+  return customer;
 }
 
 function getArticleVatRate(article) {
