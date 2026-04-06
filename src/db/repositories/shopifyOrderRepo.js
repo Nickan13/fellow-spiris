@@ -1,4 +1,22 @@
-const db = require("../index");
+const db = require("../database");
+
+function run(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve(this);
+    });
+  });
+}
+
+function get(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) return reject(err);
+      resolve(row || null);
+    });
+  });
+}
 
 // Skapa mapping (eller ignorera om redan finns)
 async function createOrderMapping({
@@ -31,7 +49,7 @@ async function createOrderMapping({
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  await db.run(sql, [
+  await run(sql, [
     locationId,
     shopifyOrderId,
     shopifyOrderGid,
@@ -55,7 +73,7 @@ async function getOrderMapping(locationId, shopifyOrderId) {
     LIMIT 1
   `;
 
-  return await db.get(sql, [locationId, shopifyOrderId]);
+  return await get(sql, [locationId, shopifyOrderId]);
 }
 
 // Uppdatera med Spiris-faktura
@@ -74,7 +92,7 @@ async function setSpirisInvoice({
     WHERE location_id = ? AND shopify_order_id = ?
   `;
 
-  await db.run(sql, [
+  await run(sql, [
     spirisInvoiceId,
     spirisInvoiceNumber,
     locationId,
@@ -82,8 +100,21 @@ async function setSpirisInvoice({
   ]);
 }
 
+async function setSpirisData(locationId, shopifyOrderId, spirisInvoiceId, spirisCustomerId) {
+  await run(
+    `
+      UPDATE shopify_order_mappings
+      SET spiris_invoice_id = ?, spiris_customer_id = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE location_id = ?
+        AND shopify_order_id = ?
+    `,
+    [spirisInvoiceId, spirisCustomerId, locationId, shopifyOrderId]
+  );
+}
+
 module.exports = {
   createOrderMapping,
   getOrderMapping,
+  setSpirisData,
   setSpirisInvoice
 };

@@ -18,7 +18,7 @@ router.get("/spiris/start", (req, res) => {
     });
   }
 
-  const scope = "offline_access ea:api ea:sales ea:accounting";
+  const scope = "offline_access ea:api ea:sales ea:accounting ea:purchase ea:purchase_readonly";
   const prompt = "select_account";
   const acrValues = "service:44643EB1-3F76-4C1C-A672-402AE8085934";
 

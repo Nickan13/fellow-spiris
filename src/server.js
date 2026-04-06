@@ -4,6 +4,7 @@ const { runMigrations } = require("./db/migrations");
 const { startArticleAutoSync } = require("./services/articleAutoSyncService");
 const { startInvoiceRetryWorker } = require("./services/invoiceRetryService");
 const { startProductImportWorker } = require("./services/productImportWorkerService");
+const { startShopifyOrderWorker } = require("./services/shopifyOrderWorkerService");
 
 runMigrations();
 
@@ -12,4 +13,5 @@ app.listen(env.port, () => {
   startArticleAutoSync();
   startInvoiceRetryWorker();
   startProductImportWorker();
+  startShopifyOrderWorker();
 });

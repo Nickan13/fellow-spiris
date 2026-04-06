@@ -5,6 +5,7 @@ const platformWebhookLogRepo = require("../db/repositories/platformWebhookLogRep
 const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappingRepo");
 const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
 const crypto = require("crypto");
+const shopifyOrderRepo = require("../db/repositories/shopifyOrderRepo");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -486,6 +487,135 @@ router.post("/shopify/customer-webhook", async (req, res) => {
     console.error("[shopify customer webhook] error:", err);
     return res.status(500).send("error");
   }
+});
+
+router.post("/shopify/orders/create", async (req, res) => {
+  console.log("[SHOPIFY ORDER WEBHOOK HIT]");
+
+  try {
+    const payload = req.body;
+
+    const locationId = "FZK53zttFssaKFsCr9jl";
+    const shopifyOrderId = String(payload.id || "");
+
+    const shopifyOrderJobRepo = require("../db/repositories/shopifyOrderJobRepo");
+
+    const existing = await shopifyOrderRepo.getOrderMapping(
+      locationId,
+      String(shopifyOrderId)
+    );
+
+    if (existing) {
+    console.log("[WEBHOOK] order already exists, skipping job:", shopifyOrderId);
+    return res.json({ skipped: true });
+    }
+
+    await shopifyOrderJobRepo.createJob({
+      locationId,
+      shopifyOrderId,
+      eventType: "orders/create",
+      payloadJson: JSON.stringify(payload)
+    });
+
+    console.log("[SHOPIFY ORDER] job created");
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("[shopify order webhook] error:", err);
+    res.sendStatus(500);
+  }
+});
+
+router.post("/shopify/order_transactions/create", async (req, res) => {
+  console.log("[SHOPIFY ORDER TRANSACTION WEBHOOK HIT]");
+
+  try {
+    const payload = req.body || {};
+
+    const locationId = "FZK53zttFssaKFsCr9jl";
+    const shopifyOrderId = String(payload.order_id || "");
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    let mapping = null;
+
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      mapping = await shopifyOrderRepo.getOrderMapping(locationId, shopifyOrderId);
+
+      if (mapping?.spiris_invoice_id) {
+        break;
+      }
+
+      console.log("[SHOPIFY ORDER TRANSACTION] mapping not ready yet:", {
+        shopifyOrderId,
+        attempt
+      });
+
+      await sleep(1000);
+    }
+
+    if (!mapping?.spiris_invoice_id) {
+      console.log("[SHOPIFY ORDER TRANSACTION] no completed mapping found after retry:", shopifyOrderId);
+      return res.sendStatus(200);
+    }
+
+    const orderPayload = mapping.payload_json ? JSON.parse(mapping.payload_json) : {};
+    const orderEmail = String(orderPayload?.email || "").trim().toLowerCase();
+
+    const hasTestSku = Array.isArray(orderPayload?.line_items) &&
+      orderPayload.line_items.some((li) => {
+        return String(li?.sku || "").trim().toUpperCase() === "A1";
+      });
+
+    if (orderEmail !== "annika@forgood.se" || !hasTestSku) {
+      console.log("[SHOPIFY ORDER TRANSACTION] skipping non-test payment:", {
+        shopifyOrderId,
+        email: orderEmail,
+        hasTestSku
+      });
+      return res.sendStatus(200);
+    }
+
+    const transactionKind = String(payload.kind || "").toLowerCase();
+    const transactionStatus = String(payload.status || "").toLowerCase();
+    const transactionAmount = Number(payload.amount || 0);
+    const transactionCurrency = String(payload.currency || "").toUpperCase();
+
+    const isSuccessfulSale =
+      transactionKind === "sale" &&
+      transactionStatus === "success" &&
+      transactionAmount > 0 &&
+      transactionCurrency === "SEK";
+
+    const paymentCandidate = {
+      shopifyOrderId,
+      spirisInvoiceId: mapping.spiris_invoice_id,
+      spirisCustomerId: mapping.spiris_customer_id || null,
+      transactionId: String(payload.id || ""),
+      paymentDate: String(payload.processed_at || payload.created_at || "").split("T")[0],
+      paymentAmount: transactionAmount,
+      currency: transactionCurrency,
+      accountNumber: 1581,
+      transactionKind,
+      transactionStatus,
+      isSuccessfulSale
+    };
+
+    console.log("[SHOPIFY ORDER TRANSACTION CHECK]");
+    console.log(JSON.stringify(paymentCandidate, null, 2));
+
+    return res.sendStatus(200);
+      } catch (err) {
+      console.error("[shopify order transaction webhook] error:", err);
+        return res.sendStatus(500);
+      }
+    });
+
+router.post("/test", (req, res) => {
+  console.log("[WEBHOOK TEST HIT]");
+  res.send("ok");
 });
 
 module.exports = router;

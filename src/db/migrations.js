@@ -168,6 +168,42 @@ function runMigrations() {
         ON product_import_jobs(status)
     `);
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shopify_order_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL,
+      shopify_order_id TEXT NOT NULL,
+      event_type TEXT,
+      payload_json TEXT,
+      status TEXT DEFAULT 'pending',
+      attempt_count INTEGER DEFAULT 0,
+      max_attempts INTEGER DEFAULT 5,
+      next_retry_at TEXT,
+      last_error_text TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS shopify_order_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id TEXT NOT NULL,
+    shopify_order_id TEXT NOT NULL,
+    shopify_order_gid TEXT,
+    shopify_order_name TEXT,
+    shopify_order_number TEXT,
+    shopify_shop_domain TEXT,
+    currency TEXT,
+    order_total REAL,
+    financial_status TEXT,
+    fulfillment_status TEXT,
+    payload_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
     console.log("Database migrations completed");
 
   });

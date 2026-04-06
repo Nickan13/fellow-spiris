@@ -10,6 +10,7 @@ async function resolveExistingCustomer({
   orgNumber,
   email
 }) {
+  
   if (customerType === "b2b" && orgNumber) {
     const result = await spirisService.findCustomerByOrgNumber(
       accessToken,
@@ -19,8 +20,6 @@ async function resolveExistingCustomer({
     if (result?.Data?.length) {
       return result.Data[0];
     }
-
-    return null;
   }
 
   if (email) {

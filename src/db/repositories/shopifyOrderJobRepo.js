@@ -1,4 +1,22 @@
-const db = require("../index");
+const db = require("../database");
+
+function run(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve(this);
+    });
+  });
+}
+
+function all(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows || []);
+    });
+  });
+}
 
 async function createJob({
   locationId,
@@ -19,7 +37,7 @@ async function createJob({
     VALUES (?, ?, ?, ?, 'pending', 0, 5)
   `;
 
-  await db.run(sql, [
+  await run(sql, [
     locationId,
     shopifyOrderId,
     eventType,
@@ -40,7 +58,7 @@ async function getPendingJobs(limit = 20) {
     LIMIT ?
   `;
 
-  return await db.all(sql, [limit]);
+  return await all(sql, [limit]);
 }
 
 async function markProcessing(jobId) {
@@ -52,7 +70,7 @@ async function markProcessing(jobId) {
     WHERE id = ?
   `;
 
-  await db.run(sql, [jobId]);
+  await run(sql, [jobId]);
 }
 
 async function markCompleted(jobId) {
@@ -64,7 +82,7 @@ async function markCompleted(jobId) {
     WHERE id = ?
   `;
 
-  await db.run(sql, [jobId]);
+  await run(sql, [jobId]);
 }
 
 async function markFailed(jobId, errorText) {
@@ -77,7 +95,7 @@ async function markFailed(jobId, errorText) {
     WHERE id = ?
   `;
 
-  await db.run(sql, [errorText, jobId]);
+  await run(sql, [errorText, jobId]);
 }
 
 async function markRetry(jobId, errorText, attemptCount, nextRetryAt) {
@@ -92,7 +110,7 @@ async function markRetry(jobId, errorText, attemptCount, nextRetryAt) {
     WHERE id = ?
   `;
 
-  await db.run(sql, [
+  await run(sql, [
     errorText,
     attemptCount,
     nextRetryAt,

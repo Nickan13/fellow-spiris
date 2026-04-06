@@ -71,6 +71,64 @@ async function resolveSpirisCustomer({
   return spirisService.createCustomer(accessToken, createPayload);
 }
 
+async function resolveSpirisCustomerStrict({
+  accessToken,
+  customerType,
+  orgNumber,
+  email,
+  createPayload
+}) {
+  const customer = await resolveSpirisCustomer({
+    accessToken,
+    customerType,
+    orgNumber,
+    email,
+    createPayload
+  });
+
+  if (customerType !== "b2b") {
+    return customer;
+  }
+
+  if (!customer?.IsPrivatePerson) {
+    return customer;
+  }
+
+  if (!createPayload) {
+    throw new Error("Resolved private person for b2b customer, but no createPayload provided");
+  }
+
+  return spirisService.createCustomer(accessToken, {
+    ...createPayload,
+    IsPrivatePerson: false
+  });
+}
+
+function getArticleVatRate(article) {
+  const gross = Number(article?.raw?.GrossPrice);
+  const net = Number(article?.raw?.NetPrice);
+
+  if (!Number.isFinite(gross) || !Number.isFinite(net) || net <= 0 || gross < net) {
+    return 0;
+  }
+
+  return (gross - net) / net;
+}
+
+function convertInclusiveToExclusive(unitPriceInclVat, vatRate) {
+  const price = Number(unitPriceInclVat);
+
+  if (!Number.isFinite(price)) {
+    throw new Error(`Invalid unit price: ${unitPriceInclVat}`);
+  }
+
+  if (!Number.isFinite(vatRate) || vatRate <= 0) {
+    return price;
+  }
+
+  return Number((price / (1 + vatRate)).toFixed(2));
+}
+
 async function createInvoiceDraftFromSimpleInput(input) {
   const {
     locationId,
@@ -92,7 +150,7 @@ async function createInvoiceDraftFromSimpleInput(input) {
 
   const accessToken = await tokenService.getAccessTokenForLocation(locationId);
 
-  const customer = await resolveSpirisCustomer({
+  const customer = await resolveSpirisCustomerStrict({
     accessToken,
     customerType,
     orgNumber,
@@ -232,7 +290,79 @@ async function createInvoiceFromPlatformPayload(payload) {
   };
 }
 
+async function createInvoiceFromSimpleInput(input) {
+  const {
+    locationId,
+    customerType,
+    orgNumber,
+    email,
+    customerCreatePayload,
+    invoiceDate,
+    rows
+  } = input;
+
+  if (!locationId) {
+    throw new Error("locationId is required");
+  }
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("rows are required");
+  }
+
+  const accessToken = await tokenService.getAccessTokenForLocation(locationId);
+
+  const customer = await resolveSpirisCustomerStrict({
+    accessToken,
+    customerType,
+    orgNumber,
+    email,
+    createPayload: customerCreatePayload
+  });
+
+  const invoiceRows = [];
+
+  for (const row of rows) {
+    const article = await resolveSpirisArticle(locationId, row.articleNumber);
+
+    const inputUnitPrice = Number(row.unitPrice || 0);
+
+    if (!Number.isFinite(inputUnitPrice)) {
+      throw new Error(`Invalid unitPrice for articleNumber=${row.articleNumber}`);
+    }
+
+    const vatRate = getArticleVatRate(article);
+
+    const unitPriceForSpiris =
+      customerType === "b2b"
+        ? convertInclusiveToExclusive(inputUnitPrice, vatRate)
+        : inputUnitPrice;
+
+    invoiceRows.push({
+      ArticleId: article.spirisArticleId,
+      Text: row.text || article.name,
+      Quantity: row.quantity,
+      UnitPrice: unitPriceForSpiris
+    });
+  }
+
+  const payload = {
+    CustomerId: customer.Id,
+    InvoiceDate: toIsoDate(invoiceDate),
+    IncludesVat: true,
+    Rows: invoiceRows
+  };
+
+  const invoice = await spirisService.createInvoice(accessToken, payload);
+
+  return {
+    customer,
+    payload,
+    invoice
+  };
+}
+
 module.exports = {
   createInvoiceDraftFromSimpleInput,
+  createInvoiceFromSimpleInput,
   createInvoiceFromPlatformPayload
 };
