@@ -354,10 +354,26 @@ async function createInvoiceFromSimpleInput(input) {
 
   const invoice = await spirisService.createInvoice(accessToken, payload);
 
+  const paymentPayload = {
+    PaymentDate: toIsoDate(invoiceDate),
+    PaymentAmount: Number(invoice.TotalAmount),
+    PaymentAmountInvoiceCurrency: Number(invoice.TotalAmountInvoiceCurrency || invoice.TotalAmount),
+    PaymentCurrency: invoice.CurrencyCode || "SEK",
+    PaymentType: 2,
+    CompanyBankAccountId: "7f504150-cea2-401d-8553-da9391b9b1f7"
+  };
+
+  const payment = await spirisService.createInvoicePayment(
+    accessToken,
+    invoice.Id,
+    paymentPayload
+  );
+
   return {
     customer,
     payload,
-    invoice
+    invoice,
+    payment
   };
 }
 
