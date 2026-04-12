@@ -6,6 +6,9 @@ const spirisInvoiceMappingRepo = require("../db/repositories/spirisInvoiceMappin
 const invoiceJobRepo = require("../db/repositories/invoiceJobRepo");
 const crypto = require("crypto");
 const shopifyOrderRepo = require("../db/repositories/shopifyOrderRepo");
+const shopifyOrderTransactionRepo = require("../db/repositories/shopfyOrderTransactionRepo");
+const shopifyService = require("../services/shopifyService");
+const shopifyCustomerMetricsService = require("../services/shopifyCustomerMetricsService");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -363,6 +366,7 @@ async function getShopifyCustomerWithBirthday(customerId) {
         email
         firstName
         lastName
+        createdAt
         metafield(namespace: "facts", key: "birth_date") {
           value
         }
@@ -394,10 +398,19 @@ async function getShopifyCustomerWithBirthday(customerId) {
     throw new Error(`Shopify GraphQL errors: ${JSON.stringify(data.errors)}`);
   }
 
-  return data?.data?.customer || null;
+  const customer = data?.data?.customer || null;
+
+  if (!customer) {
+    return null;
+  }
+
+  return {
+    ...customer,
+    customerSince: customer.createdAt ? customer.createdAt.split("T")[0] : ""
+  };
 }
 
-async function upsertBirthdayToFellow(customer) {
+async function upsertShopifyCustomerToFellow(customer) {
   if (!customer?.email) return;
 
   const birthDate = customer?.metafield?.value || "";
@@ -413,23 +426,58 @@ async function upsertBirthdayToFellow(customer) {
     payload.dateOfBirth = birthDate;
   }
 
-  const res = await fetch("https://services.leadconnectorhq.com/contacts/upsert", {
+  const upsertRes = await fetch("https://services.leadconnectorhq.com/contacts/upsert", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${process.env.HL_TOKEN}`,
+      "Authorization": `Bearer ${process.env.GHL_SUBACCOUNT_PIT}`,
       "Version": "2021-07-28",
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
   });
 
-  const data = await res.json();
+  const upsertData = await upsertRes.json();
 
-  if (!res.ok) {
-    throw new Error(`HighLevel HTTP ${res.status}: ${JSON.stringify(data)}`);
+  if (!upsertRes.ok) {
+    throw new Error(`HighLevel upsert HTTP ${upsertRes.status}: ${JSON.stringify(upsertData)}`);
   }
 
-  return data;
+  const contactId = upsertData?.contact?.id;
+
+  if (!contactId) {
+    throw new Error("No contact id returned from HighLevel upsert");
+  }
+
+  const customFields = [];
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(customer.customerSince || "")) {
+    customFields.push({
+      id: "h0tMu3xB2CJk7n8kCvr1",
+      field_value: customer.customerSince
+    });
+  }
+
+  if (customFields.length === 0) {
+    return upsertData;
+  }
+
+  const updateRes = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${process.env.GHL_SUBACCOUNT_PIT}`,
+      "Version": "2021-07-28",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ customFields })
+  });
+
+  const updateData = await updateRes.json();
+
+  if (!updateRes.ok) {
+    throw new Error(`HighLevel update HTTP ${updateRes.status}: ${JSON.stringify(updateData)}`);
+  }
+
+  return updateData;
 }
 
 function verifyShopifyWebhook(req) {
@@ -479,9 +527,9 @@ router.post("/shopify/customer-webhook", async (req, res) => {
     }
 
     const customer = await getShopifyCustomerWithBirthday(shopifyCustomerId);
-    await upsertBirthdayToFellow(customer);
+    await upsertShopifyCustomerToFellow(customer);
 
-    console.log(`[shopify customer webhook] synced customer ${shopifyCustomerId}`);
+    console.log(`[shopify customer webhook] synced customer profile ${shopifyCustomerId}`);
     return res.status(200).send("ok");
   } catch (err) {
     console.error("[shopify customer webhook] error:", err);
@@ -493,10 +541,18 @@ router.post("/shopify/orders/create", async (req, res) => {
   console.log("[SHOPIFY ORDER WEBHOOK HIT]");
 
   try {
-    const payload = req.body;
+    const isValid = verifyShopifyWebhook(req);
+
+    if (!isValid) {
+      console.error("[shopify order webhook] invalid HMAC");
+      return res.status(401).send("invalid signature");
+    }
+
+    const payload = req.body || {};
 
     const locationId = "FZK53zttFssaKFsCr9jl";
     const shopifyOrderId = String(payload.id || "");
+    const email = String(payload.email || payload.customer?.email || "").trim().toLowerCase();
 
     const shopifyOrderJobRepo = require("../db/repositories/shopifyOrderJobRepo");
 
@@ -506,23 +562,52 @@ router.post("/shopify/orders/create", async (req, res) => {
     );
 
     if (existing) {
-    console.log("[WEBHOOK] order already exists, skipping job:", shopifyOrderId);
-    return res.json({ skipped: true });
+      console.log("[WEBHOOK] order already exists, skipping Spiris job:", shopifyOrderId);
+    } else {
+      await shopifyOrderJobRepo.createJob({
+        locationId,
+        shopifyOrderId,
+        eventType: "orders/create",
+        payloadJson: JSON.stringify(payload)
+      });
+
+      console.log("[SHOPIFY ORDER] Spiris job created");
     }
 
-    await shopifyOrderJobRepo.createJob({
-      locationId,
-      shopifyOrderId,
-      eventType: "orders/create",
-      payloadJson: JSON.stringify(payload)
-    });
+    if (!email) {
+      console.log("[SHOPIFY ORDER] no email on order, skipping HL metrics sync");
+      return res.sendStatus(200);
+    }
 
-    console.log("[SHOPIFY ORDER] job created");
+    try {
+      const orders = await shopifyService.listOrdersByEmail({
+        shopDomain: process.env.SHOPIFY_SHOP_DOMAIN,
+        accessToken: process.env.SHOPIFY_TOKEN,
+        email
+      });
 
-    res.sendStatus(200);
+      const metrics = shopifyCustomerMetricsService.buildCustomerMetricsFromOrders(orders);
+
+      if (!metrics) {
+        console.log("[SHOPIFY ORDER] no metrics built, skipping HL update", { email });
+        return res.sendStatus(200);
+      }
+
+      await shopifyCustomerMetricsService.updateCustomerMetricsInHL(metrics);
+
+      console.log("[SHOPIFY ORDER] HL metrics updated", {
+        email,
+        ordersCount: orders.length,
+        shopifyOrdersCount: metrics.shopifyOrdersCount
+      });
+    } catch (metricsErr) {
+      console.error("[SHOPIFY ORDER] HL metrics sync failed:", metricsErr.message);
+    }
+
+    return res.sendStatus(200);
   } catch (err) {
     console.error("[shopify order webhook] error:", err);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
@@ -602,6 +687,33 @@ router.post("/shopify/order_transactions/create", async (req, res) => {
       transactionStatus,
       isSuccessfulSale
     };
+
+  try {
+  await shopifyOrderTransactionRepo.createOrIgnoreTransaction({
+    locationId,
+    shopifyOrderId,
+    shopifyTransactionId: paymentCandidate.transactionId,
+    shopifyParentId: String(payload.parent_id || ""),
+    shopifyOrderName: mapping.shopify_order_name || null,
+    kind: paymentCandidate.transactionKind,
+    status: paymentCandidate.transactionStatus,
+    gateway: String(payload.gateway || ""),
+    paymentDate: paymentCandidate.paymentDate,
+    currency: paymentCandidate.currency,
+    amount: paymentCandidate.paymentAmount,
+    rawPayloadJson: JSON.stringify(payload),
+    spirisInvoiceId: paymentCandidate.spirisInvoiceId,
+    spirisCustomerId: paymentCandidate.spirisCustomerId
+  });
+
+  console.log("[SHOPIFY ORDER TRANSACTION] saved to DB:", {
+    shopifyOrderId,
+    transactionId: paymentCandidate.transactionId
+  });
+
+} catch (dbErr) {
+  console.error("[SHOPIFY ORDER TRANSACTION] DB error:", dbErr.message);
+}
 
     console.log("[SHOPIFY ORDER TRANSACTION CHECK]");
     console.log(JSON.stringify(paymentCandidate, null, 2));
