@@ -9,6 +9,7 @@ const shopifyOrderRepo = require("../db/repositories/shopifyOrderRepo");
 const shopifyOrderTransactionRepo = require("../db/repositories/shopfyOrderTransactionRepo");
 const shopifyService = require("../services/shopifyService");
 const shopifyCustomerMetricsService = require("../services/shopifyCustomerMetricsService");
+const { upsertCustomerDataToHL } = require("../services/shopifyCustomerProfileService");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -408,76 +409,6 @@ async function getShopifyCustomerWithBirthday(customerId) {
     ...customer,
     customerSince: customer.createdAt ? customer.createdAt.split("T")[0] : ""
   };
-}
-
-async function upsertShopifyCustomerToFellow(customer) {
-  if (!customer?.email) return;
-
-  const birthDate = customer?.metafield?.value || "";
-
-  const payload = {
-    locationId: "FZK53zttFssaKFsCr9jl",
-    email: customer.email,
-    firstName: customer.firstName || "",
-    lastName: customer.lastName || ""
-  };
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
-    payload.dateOfBirth = birthDate;
-  }
-
-  const upsertRes = await fetch("https://services.leadconnectorhq.com/contacts/upsert", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.GHL_SUBACCOUNT_PIT}`,
-      "Version": "2021-07-28",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const upsertData = await upsertRes.json();
-
-  if (!upsertRes.ok) {
-    throw new Error(`HighLevel upsert HTTP ${upsertRes.status}: ${JSON.stringify(upsertData)}`);
-  }
-
-  const contactId = upsertData?.contact?.id;
-
-  if (!contactId) {
-    throw new Error("No contact id returned from HighLevel upsert");
-  }
-
-  const customFields = [];
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(customer.customerSince || "")) {
-    customFields.push({
-      id: "h0tMu3xB2CJk7n8kCvr1",
-      field_value: customer.customerSince
-    });
-  }
-
-  if (customFields.length === 0) {
-    return upsertData;
-  }
-
-  const updateRes = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
-    method: "PUT",
-    headers: {
-      "Authorization": `Bearer ${process.env.GHL_SUBACCOUNT_PIT}`,
-      "Version": "2021-07-28",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ customFields })
-  });
-
-  const updateData = await updateRes.json();
-
-  if (!updateRes.ok) {
-    throw new Error(`HighLevel update HTTP ${updateRes.status}: ${JSON.stringify(updateData)}`);
-  }
-
-  return updateData;
 }
 
 function verifyShopifyWebhook(req) {
