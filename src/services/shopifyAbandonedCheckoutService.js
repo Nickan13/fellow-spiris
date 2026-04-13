@@ -98,6 +98,8 @@ async function updateAbandonedCheckoutInHL(payload) {
     )
   );
 
+  const marketingConsentValue = getMarketingConsentValueFromCheckout(payload);
+
   const customFields = [
     {
       id: FIELD_IDS.lastAbandonedCheckoutDate,
