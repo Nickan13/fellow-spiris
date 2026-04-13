@@ -21,7 +21,9 @@ const FIELD_IDS = {
   preferredProducts: "yYgGRbw9OPXRqt8awcTT",
   shopifyOrdersCount: "Ch5agbbY5JlTkApoYcPE",
   lastOrderDate: "0ATfuZUTlTpO51mneYcR",
-  lastOrderValue: "ghjgPnDN7NjqMjqJ47SB"
+  lastOrderValue: "ghjgPnDN7NjqMjqJ47SB",
+  orderAfterAbandoned: "Il2vyrq0FRA24Jf0KnDP",
+  lastAbandonedCheckout: "zJ3ehF3uZCCqwuZaANWy"
 };
 
 function normalizeEmail(email) {
@@ -215,6 +217,19 @@ async function updateCustomerMetricsInHL(metrics) {
 
   const contactId = await upsertContactByEmail(metrics.email);
 
+  let orderAfterAbandoned = "no";
+
+  const lastOrderDate = metrics.lastOrderDate; // denna finns i din metrics
+  const lastAbandoned = existingContact?.customFields?.find(
+    f => f.id === FIELD_IDS.lastAbandonedCheckout
+  )?.value;
+
+  if (lastOrderDate && lastAbandoned) {
+    if (new Date(lastOrderDate) > new Date(lastAbandoned)) {
+      orderAfterAbandoned = "yes";
+    }
+  }
+
   const payload = {
     customFields: [
       { id: FIELD_IDS.shopifyCustomerId, field_value: metrics.shopifyCustomerId },
@@ -235,7 +250,8 @@ async function updateCustomerMetricsInHL(metrics) {
       { id: FIELD_IDS.preferredProducts, field_value: metrics.preferredProducts },
       { id: FIELD_IDS.lastOrderValue, field_value: String(metrics.lastOrderValue) },
       { id: FIELD_IDS.shopifyOrdersCount, field_value: String(metrics.shopifyOrdersCount) },
-      { id: FIELD_IDS.lastOrderDate, field_value: metrics.lastOrderDate }
+      { id: FIELD_IDS.lastOrderDate, field_value: metrics.lastOrderDate },
+      { id: FIELD_IDS.orderAfterAbandoned, field_value: orderAfterAbandoned }
     ]
   };
 
