@@ -11,6 +11,7 @@ const shopifyService = require("../services/shopifyService");
 const shopifyCustomerMetricsService = require("../services/shopifyCustomerMetricsService");
 const { upsertCustomerDataToHL } = require("../services/shopifyCustomerProfileService");
 const { updateAbandonedCheckoutInHL } = require("../services/shopifyAbandonedCheckoutService");
+const { upsertShopifyCustomerToFellow } = require("../services/shopifyCustomerProfileService");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
