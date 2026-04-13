@@ -3,7 +3,8 @@ const LOCATION_ID = "FZK53zttFssaKFsCr9jl";
 const FIELD_IDS = {
   lastAbandonedCheckoutDate: "zJ3ehF3uZCCqwuZaANWy",
   abandonedCheckoutProducts: "RxP378ELmyCXkMtYplm6",
-  abandonedCheckoutValue: "2UZpUtepsMIAHSkH4phH"
+  abandonedCheckoutValue: "2UZpUtepsMIAHSkH4phH",
+  marketingConsent: "imJSOgomoDH2CQevqC0A"
 };
 
 function toDateOnly(value) {
@@ -35,6 +36,18 @@ function buildProductsText(lineItems) {
     .sort((a, b) => a[0].localeCompare(b[0], "sv"))
     .map(([name, qty]) => `${name}: ${qty}`)
     .join("\n");
+}
+
+function getMarketingConsentValueFromCheckout(payload) {
+  if (payload?.buyer_accepts_marketing === true) {
+    const sourceDate = String(payload?.updated_at || payload?.created_at || "");
+    if (sourceDate.includes("T")) {
+      return sourceDate.split("T")[0];
+    }
+    return "Ja";
+  }
+
+  return "";
 }
 
 async function upsertContactByEmail(email) {
@@ -97,6 +110,10 @@ async function updateAbandonedCheckoutInHL(payload) {
     {
       id: FIELD_IDS.abandonedCheckoutValue,
       field_value: abandonedCheckoutValue
+    },
+    {
+      id: FIELD_IDS.marketingConsent,
+      field_value: marketingConsentValue
     }
   ];
 
