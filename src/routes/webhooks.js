@@ -10,6 +10,7 @@ const shopifyOrderTransactionRepo = require("../db/repositories/shopfyOrderTrans
 const shopifyService = require("../services/shopifyService");
 const shopifyCustomerMetricsService = require("../services/shopifyCustomerMetricsService");
 const { upsertCustomerDataToHL } = require("../services/shopifyCustomerProfileService");
+const { updateAbandonedCheckoutInHL } = require("../services/shopifyAbandonedCheckoutService");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -368,6 +369,10 @@ async function getShopifyCustomerWithBirthday(customerId) {
         firstName
         lastName
         createdAt
+        emailMarketingConsent {
+          marketingState
+          consentUpdatedAt
+        }
         metafield(namespace: "facts", key: "birth_date") {
           value
         }
@@ -655,6 +660,39 @@ router.post("/shopify/order_transactions/create", async (req, res) => {
         return res.sendStatus(500);
       }
     });
+
+router.post("/shopify/checkouts/update", async (req, res) => {
+  try {
+    const isValid = verifyShopifyWebhook(req);
+
+    if (!isValid) {
+      console.error("[shopify checkout webhook] invalid HMAC");
+      return res.status(401).send("invalid signature");
+    }
+
+    const payload = req.body || {};
+
+    if (payload.completed_at) {
+      return res.status(200).send("ok");
+    }
+
+    if (!payload.email) {
+      return res.status(200).send("ok");
+    }
+
+    await updateAbandonedCheckoutInHL(payload);
+
+    console.log("[shopify checkout webhook] synced abandoned checkout", {
+      email: payload.email,
+      checkoutId: payload.id || null
+    });
+
+    return res.status(200).send("ok");
+  } catch (err) {
+    console.error("[shopify checkout webhook] error:", err);
+    return res.status(500).send("error");
+  }
+});
 
 router.post("/test", (req, res) => {
   console.log("[WEBHOOK TEST HIT]");
