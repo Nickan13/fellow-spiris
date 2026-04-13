@@ -417,6 +417,20 @@ async function getShopifyCustomerWithBirthday(customerId) {
   };
 }
 
+function shouldSkipEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+
+  if (!normalized) {
+    return true;
+  }
+
+  return (
+    normalized.includes("joonix.net") ||
+    normalized.includes("example.com") ||
+    normalized.includes("test@")
+  );
+}
+
 function verifyShopifyWebhook(req) {
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
   const hmacHeader = req.get("X-Shopify-Hmac-Sha256");
@@ -464,6 +478,12 @@ router.post("/shopify/customer-webhook", async (req, res) => {
     }
 
     const customer = await getShopifyCustomerWithBirthday(shopifyCustomerId);
+
+    if (shouldSkipEmail(customer?.email)) {
+      console.log("[shopify customer webhook] skipped non-real email:", customer?.email || "");
+      return res.status(200).send("ok");
+    }
+
     await upsertShopifyCustomerToFellow(customer);
 
     console.log(`[shopify customer webhook] synced customer profile ${shopifyCustomerId}`);
@@ -490,6 +510,10 @@ router.post("/shopify/orders/create", async (req, res) => {
     const locationId = "FZK53zttFssaKFsCr9jl";
     const shopifyOrderId = String(payload.id || "");
     const email = String(payload.email || payload.customer?.email || "").trim().toLowerCase();
+      if (shouldSkipEmail(email)) {
+        console.log("[SHOPIFY ORDER] skipped non-real email:", email);
+        return res.sendStatus(200);
+      }
 
     const shopifyOrderJobRepo = require("../db/repositories/shopifyOrderJobRepo");
 
@@ -677,7 +701,8 @@ router.post("/shopify/checkouts/update", async (req, res) => {
       return res.status(200).send("ok");
     }
 
-    if (!payload.email) {
+    if (shouldSkipEmail(payload.email)) {
+      console.log("[shopify checkout webhook] skipped non-real email:", payload.email || "");
       return res.status(200).send("ok");
     }
 
