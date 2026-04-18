@@ -133,14 +133,10 @@ const orgNumber = null;
 const personName =
   `${sourceOrder.customer?.first_name || ""} ${sourceOrder.customer?.last_name || ""}`.trim();
 
-const customerName = isB2B
-  ? (!companyLooksLikeOrgNumber ? String(companyValue).trim() : "") ||
-    personName ||
-    sourceOrder.email ||
-    "Shopify customer"
-  : personName ||
-    sourceOrder.email ||
-    "Shopify customer";
+const customerName =
+  personName ||
+  sourceOrder.email ||
+  "Shopify customer";
 
 const created = await invoiceOrchestrator.createInvoiceFromSimpleInput({
   locationId: job.location_id,
