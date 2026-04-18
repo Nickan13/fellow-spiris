@@ -34,6 +34,14 @@ async function processJobs() {
   }
 
   for (const job of jobs) {
+      console.log("[SHOPIFY WORKER] starting job:", {
+        jobId: job.id,
+        locationId: job.location_id,
+        shopifyOrderId: job.shopify_order_id,
+        status: job.status,
+        attemptCount: job.attempt_count,
+        maxAttempts: job.max_attempts
+      });
   try {
     const order = await shopifyService.getOrderById({
       shopDomain: process.env.SHOPIFY_SHOP_DOMAIN,
@@ -41,9 +49,17 @@ async function processJobs() {
       orderId: job.shopify_order_id
   });
 
-  const sourceOrder = order || payload;
+  const sourceOrder = order;
 
-  console.log("[SHOPIFY WORKER] fetched order:", order.id);
+  console.log("[SHOPIFY WORKER] fetched order:", {
+    orderId: order?.id || null,
+    email: sourceOrder?.email || null,
+    lineItemCount: Array.isArray(sourceOrder?.line_items) ? sourceOrder.line_items.length : 0,
+    shippingLineCount: Array.isArray(sourceOrder?.shipping_lines) ? sourceOrder.shipping_lines.length : 0,
+    financialStatus: sourceOrder?.financial_status || null,
+    totalPrice: sourceOrder?.total_price || null,
+    currency: sourceOrder?.currency || null
+  });
 
   //tillfällig kod innan vi släpper Sharespine_2
   if (!isAllowedTestOrder(sourceOrder)) {
@@ -59,8 +75,12 @@ async function processJobs() {
     
   await shopifyOrderJobRepo.markProcessing(job.id);
 
-  const payload = JSON.parse(job.payload_json || "{}");
   const shopifyOrderId = String(job.shopify_order_id);
+
+  console.log("[SHOPIFY WORKER] job marked processing:", {
+    jobId: job.id,
+    shopifyOrderId
+  });
 
   const rows = [];
 
@@ -89,6 +109,12 @@ async function processJobs() {
     }
 }
 
+console.log("[SHOPIFY WORKER] built invoice rows:", {
+  shopifyOrderId,
+  rowCount: rows.length,
+  rows
+});
+
 // 🔹 Idempotens: kolla om order redan finns
 const existing = await shopifyOrderRepo.getOrderMapping(
   job.location_id,
@@ -106,6 +132,11 @@ if (existing) {
 }
 
 // 🔹 Spara mapping (utan Spiris än)
+console.log("[SHOPIFY WORKER] creating initial order mapping:", {
+  shopifyOrderId,
+  locationId: job.location_id
+});
+
 await shopifyOrderRepo.createOrderMapping({
   locationId: job.location_id,
   shopifyOrderId,
@@ -122,6 +153,11 @@ await shopifyOrderRepo.createOrderMapping({
   financialStatus: sourceOrder?.financial_status || null,
   fulfillmentStatus: sourceOrder?.fulfillment_status || null,
   payloadJson: JSON.stringify(sourceOrder)
+});
+
+console.log("[SHOPIFY WORKER] initial order mapping created:", {
+  shopifyOrderId,
+  locationId: job.location_id
 });
 
 const customerTags = String(sourceOrder.customer?.tags || "").toLowerCase();
@@ -141,6 +177,14 @@ const orgNumber =
   normalizedOrgNumber.length >= 10 ? normalizedOrgNumber : null;
 
 const customerType = isB2B ? "b2b" : "b2c";
+
+console.log("[SHOPIFY WORKER] resolved customer type:", {
+  shopifyOrderId,
+  customerType,
+  orgNumber,
+  email: sourceOrder.email || null,
+  companyValue: String(companyValue || "")
+});
 
 const companyLooksLikeOrgNumber =
   Boolean(String(companyValue).trim()) && Boolean(orgNumber);
@@ -192,6 +236,16 @@ const created = await invoiceOrchestrator.createInvoiceFromSimpleInput({
   rows
 });
 
+console.log("[SHOPIFY WORKER] Spiris invoice flow completed:", {
+  shopifyOrderId,
+  spirisCustomerId: created?.customer?.Id || null,
+  spirisInvoiceId: created?.invoice?.Id || null,
+  spirisInvoiceNumber: created?.invoice?.InvoiceNumber || null,
+  spirisPaymentDate: created?.payment?.PaymentDate || null,
+  spirisPaymentAmount: created?.payment?.PaymentAmount || null,
+  spirisBankTransactionId: created?.payment?.BankTransactionId || null
+});
+
 await shopifyOrderRepo.setSpirisData(
   job.location_id,
   shopifyOrderId,
@@ -199,14 +253,24 @@ await shopifyOrderRepo.setSpirisData(
   created.customer.Id
 );
 
-await shopifyOrderJobRepo.markCompleted(job.id);
-    } catch (err) {
-      console.error("[shopify worker] error:", err.message);
+console.log("[SHOPIFY WORKER] mapping updated with Spiris data:", {
+  shopifyOrderId,
+  spirisInvoiceId: created.invoice.Id,
+  spirisCustomerId: created.customer.Id
+});
 
-if (err.response) {
-  console.error("[shopify worker] response status:", err.response.status);
-  console.error("[shopify worker] response data:", JSON.stringify(err.response.data, null, 2));
-} else if (err.stack) {
+await shopifyOrderJobRepo.markCompleted(job.id);
+  console.log("[SHOPIFY WORKER] job completed:", {
+    jobId: job.id,
+    shopifyOrderId
+  });
+  } catch (err) {
+    console.error("[shopify worker] error:", err.message);
+
+  if (err.response) {
+    console.error("[shopify worker] response status:", err.response.status);
+    console.error("[shopify worker] response data:", JSON.stringify(err.response.data, null, 2));
+  } else if (err.stack) {
   console.error("[shopify worker] stack:", err.stack);
 }
 
