@@ -3,27 +3,6 @@ const shopifyOrderRepo = require("../db/repositories/shopifyOrderRepo");
 const invoiceOrchestrator = require("./invoiceOrchestrator");
 const shopifyService = require("./shopifyService");
 
-//tilfällig kod innan vi släpper Sharespine - med testprodukt mm.
-const TEST_MODE_ONLY = true;
-const TEST_CUSTOMER_EMAIL = "annika@forgood.se";
-const TEST_PRODUCT_SKU = "A1";
-
-function isAllowedTestOrder(sourceOrder) {
-  if (!TEST_MODE_ONLY) {
-    return true;
-  }
-
-  const orderEmail = String(sourceOrder?.email || "").trim().toLowerCase();
-
-  const hasTestSku = Array.isArray(sourceOrder?.line_items) &&
-    sourceOrder.line_items.some((li) => {
-      return String(li?.sku || "").trim().toUpperCase() === TEST_PRODUCT_SKU;
-    });
-
-  return orderEmail === TEST_CUSTOMER_EMAIL && hasTestSku;
-}
-//slut tillfällig kod innan vi släpper Sharespine
-
 async function processJobs() {
   //console.log("[SHOPIFY WORKER] checking jobs...");
   const jobs = await shopifyOrderJobRepo.getPendingJobs(10);
@@ -60,18 +39,6 @@ async function processJobs() {
     totalPrice: sourceOrder?.total_price || null,
     currency: sourceOrder?.currency || null
   });
-
-  //tillfällig kod innan vi släpper Sharespine_2
-  if (!isAllowedTestOrder(sourceOrder)) {
-  console.log("[SHOPIFY WORKER] skipping non-test order:", {
-    orderId: sourceOrder?.id || null,
-    email: sourceOrder?.email || null
-  });
-
-  await shopifyOrderJobRepo.markCompleted(job.id);
-    continue;
-  }
-  //slut tillfällig kod innan vi släpper Sharespine_2
     
   await shopifyOrderJobRepo.markProcessing(job.id);
 
