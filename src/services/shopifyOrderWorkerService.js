@@ -127,34 +127,8 @@ console.log("[SHOPIFY WORKER] initial order mapping created:", {
   locationId: job.location_id
 });
 
-const customerTags = String(sourceOrder.customer?.tags || "").toLowerCase();
-
-const companyValue =
-  sourceOrder.billing_address?.company ||
-  sourceOrder.shipping_address?.company ||
-  sourceOrder.customer?.default_address?.company ||
-    "";
-
-const isB2B =
-  customerTags.includes("b2b") ||
-  Boolean(String(companyValue).trim());
-
-const normalizedOrgNumber = String(companyValue).replace(/[^0-9]/g, "");
-const orgNumber =
-  normalizedOrgNumber.length >= 10 ? normalizedOrgNumber : null;
-
-const customerType = isB2B ? "b2b" : "b2c";
-
-console.log("[SHOPIFY WORKER] resolved customer type:", {
-  shopifyOrderId,
-  customerType,
-  orgNumber,
-  email: sourceOrder.email || null,
-  companyValue: String(companyValue || "")
-});
-
-const companyLooksLikeOrgNumber =
-  Boolean(String(companyValue).trim()) && Boolean(orgNumber);
+const customerType = "b2c";
+const orgNumber = null;
 
 const personName =
   `${sourceOrder.customer?.first_name || ""} ${sourceOrder.customer?.last_name || ""}`.trim();
