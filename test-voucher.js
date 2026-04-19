@@ -3,7 +3,8 @@ const axios = require("axios");
 const tokenService = require("./src/services/tokenService");
 
 const LOCATION_ID = "FZK53zttFssaKFsCr9jl";
-const SPIRIS_API = "https://eaccounting.vismaonline.com";
+const env = require("./src/config/env");
+const SPIRIS_API = env.spirisApiBase;
 
 async function main() {
   const token = await tokenService.getAccessTokenForLocation(LOCATION_ID);
