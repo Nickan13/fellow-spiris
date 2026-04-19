@@ -18,6 +18,15 @@ function get(sql, params = []) {
   });
 }
 
+function all(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows || []);
+    });
+  });
+}
+
 // Skapa mapping (eller ignorera om redan finns)
 async function createOrderMapping({
   locationId,
@@ -112,9 +121,21 @@ async function setSpirisData(locationId, shopifyOrderId, spirisInvoiceId, spiris
   );
 }
 
+async function getRecentOrderMappings(limit = 20) {
+  const sql = `
+    SELECT *
+    FROM shopify_order_mappings
+    ORDER BY id DESC
+    LIMIT ?
+  `;
+
+  return await all(sql, [limit]);
+}
+
 module.exports = {
   createOrderMapping,
   getOrderMapping,
   setSpirisData,
-  setSpirisInvoice
+  setSpirisInvoice,
+  getRecentOrderMappings
 };

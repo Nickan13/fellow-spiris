@@ -1,6 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const router = express.Router();
+const shopifyOrderJobRepo = require("../db/repositories/shopifyOrderJobRepo");
+const shopifyOrderRepo = require("../db/repositories/shopifyOrderRepo");
 
 const env = require("../config/env");
 const platformAppTokenRepo = require("../db/repositories/platformAppTokenRepo");
@@ -1943,6 +1945,54 @@ router.get("/integration/fellow/collections/:locationId", async (req, res) => {
       ok: false,
       error: "Failed to fetch Fellow collections",
       details: err.response?.data || err.message
+    });
+  }
+});
+
+router.get("/shopify/status/:locationId", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+
+    if (!locationId) {
+      return res.status(400).json({
+        ok: false,
+        error: "locationId is required"
+      });
+    }
+
+    const jobs = await shopifyOrderJobRepo.getRecentJobs(20);
+    const mappings = await shopifyOrderRepo.getRecentOrderMappings(20);
+
+    const filteredJobs = jobs.filter((j) => j.location_id === locationId);
+    const filteredMappings = mappings.filter((m) => m.location_id === locationId);
+
+    return res.json({
+      ok: true,
+      explanation: {
+        orderFlow: [
+          "Shopify order webhook creates a job",
+          "Worker fetches the Shopify order",
+          "Existing Spiris customer is resolved",
+          "Invoice is created in Spiris",
+          "Payment is created in Spiris against 1941",
+          "Later payout handling should move 1941 to 1940 and fees to 6044"
+        ],
+        retryPolicy: {
+          maxAttempts: 5,
+          retryDelayMinutes: 5,
+          note: "Jobs with status failed are not retried automatically unless manually requeued"
+        }
+      },
+      jobs: filteredJobs,
+      mappings: filteredMappings
+    });
+  } catch (err) {
+    console.error("api2 shopify status error:", err.message);
+
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch Shopify status",
+      details: err.message
     });
   }
 });

@@ -117,6 +117,22 @@ async function createInvoice(accessToken, payload) {
   return response.data;
 }
 
+async function createCreditInvoice(accessToken, invoiceId, payload) {
+  if (!invoiceId) {
+    throw new Error("invoiceId is required");
+  }
+
+  const response = await axios.post(
+    `${env.spirisApiBase}/v2/customerinvoices/${invoiceId}/creditinvoices`,
+    payload,
+    {
+      headers: getAuthHeaders(accessToken)
+    }
+  );
+
+  return response.data;
+}
+
 async function createInvoicePayment(accessToken, invoiceId, payload) {
   if (!invoiceId) {
     throw new Error("invoiceId is required");
@@ -218,5 +234,6 @@ module.exports = {
   createCustomer,
   createInvoiceDraft,
   createInvoice,
+  createCreditInvoice,
   createInvoicePayment
 };

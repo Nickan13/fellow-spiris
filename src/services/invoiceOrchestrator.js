@@ -145,12 +145,28 @@ async function createInvoiceDraftFromSimpleInput(input) {
 
   const accessToken = await tokenService.getAccessTokenForLocation(locationId);
 
+  console.log("[SPIRIS ORCHESTRATOR] starting createInvoiceFromSimpleInput:", {
+    locationId,
+    customerType,
+    orgNumber: orgNumber || null,
+    email: email || null,
+    invoiceDate: invoiceDate || null,
+    rowCount: Array.isArray(rows) ? rows.length : 0
+  });
+
   const customer = await resolveSpirisCustomerStrict({
     accessToken,
     customerType,
     orgNumber,
     email,
     createPayload: customerCreatePayload
+  });
+
+  console.log("[SPIRIS ORCHESTRATOR] resolved existing customer:", {
+    customerId: customer?.Id || null,
+    customerNumber: customer?.CustomerNumber || null,
+    customerName: customer?.Name || customer?.CustomerName || null,
+    isPrivatePerson: customer?.IsPrivatePerson ?? null
   });
 
   const draftRows = [];
@@ -306,12 +322,28 @@ async function createInvoiceFromSimpleInput(input) {
 
   const accessToken = await tokenService.getAccessTokenForLocation(locationId);
 
+  console.log("[SPIRIS ORCHESTRATOR] starting createInvoiceFromSimpleInput:", {
+    locationId,
+    customerType,
+    orgNumber: orgNumber || null,
+    email: email || null,
+    invoiceDate: invoiceDate || null,
+    rowCount: Array.isArray(rows) ? rows.length : 0
+  });
+
   const customer = await resolveSpirisCustomerStrict({
     accessToken,
     customerType,
     orgNumber,
     email,
     createPayload: customerCreatePayload
+  });
+
+  console.log("[SPIRIS ORCHESTRATOR] resolved existing customer:", {
+    customerId: customer?.Id || null,
+    customerNumber: customer?.CustomerNumber || null,
+    customerName: customer?.Name || customer?.CustomerName || null,
+    isPrivatePerson: customer?.IsPrivatePerson ?? null
   });
 
   const invoiceRows = [];
@@ -340,6 +372,12 @@ async function createInvoiceFromSimpleInput(input) {
     });
   }
 
+  console.log("[SPIRIS ORCHESTRATOR] built invoice rows:", {
+    locationId,
+    rowCount: invoiceRows.length,
+    invoiceRows
+  });
+
   const payload = {
     CustomerId: customer.Id,
     InvoiceDate: toIsoDate(invoiceDate),
@@ -348,6 +386,15 @@ async function createInvoiceFromSimpleInput(input) {
   };
 
   const invoice = await spirisService.createInvoice(accessToken, payload);
+
+  console.log("[SPIRIS ORCHESTRATOR] invoice created:", {
+    invoiceId: invoice?.Id || null,
+    invoiceNumber: invoice?.InvoiceNumber || null,
+    totalAmount: invoice?.TotalAmount ?? null,
+    totalAmountInvoiceCurrency: invoice?.TotalAmountInvoiceCurrency ?? null,
+    currencyCode: invoice?.CurrencyCode || null,
+    customerId: invoice?.CustomerId || null
+  });
 
   const paymentPayload = {
     PaymentDate: toIsoDate(invoiceDate),
@@ -358,11 +405,25 @@ async function createInvoiceFromSimpleInput(input) {
     CompanyBankAccountId: "7f504150-cea2-401d-8553-da9391b9b1f7"
   };
 
+  console.log("[SPIRIS ORCHESTRATOR] creating invoice payment:", {
+    invoiceId: invoice?.Id || null,
+    paymentPayload
+  });
+
   const payment = await spirisService.createInvoicePayment(
     accessToken,
     invoice.Id,
     paymentPayload
   );
+
+  console.log("[SPIRIS ORCHESTRATOR] invoice payment created:", {
+    invoiceId: invoice?.Id || null,
+    companyBankAccountId: payment?.CompanyBankAccountId || null,
+    paymentDate: payment?.PaymentDate || null,
+    paymentAmount: payment?.PaymentAmount ?? null,
+    paymentCurrency: payment?.PaymentCurrency || null,
+    bankTransactionId: payment?.BankTransactionId || null
+  });
 
   return {
     customer,

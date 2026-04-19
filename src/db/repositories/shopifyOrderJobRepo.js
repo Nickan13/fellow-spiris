@@ -118,11 +118,23 @@ async function markRetry(jobId, errorText, attemptCount, nextRetryAt) {
   ]);
 }
 
+async function getRecentJobs(limit = 20) {
+  const sql = `
+    SELECT *
+    FROM shopify_order_jobs
+    ORDER BY id DESC
+    LIMIT ?
+  `;
+
+  return await all(sql, [limit]);
+}
+
 module.exports = {
   createJob,
   getPendingJobs,
   markProcessing,
   markCompleted,
   markFailed,
-  markRetry
+  markRetry,
+  getRecentJobs
 };
