@@ -194,6 +194,9 @@ db.run(`
     shopify_order_name TEXT,
     shopify_order_number TEXT,
     shopify_shop_domain TEXT,
+    spiris_invoice_id TEXT,
+    spiris_invoice_number TEXT,
+    spiris_customer_id TEXT,
     currency TEXT,
     order_total REAL,
     financial_status TEXT,
@@ -203,6 +206,78 @@ db.run(`
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shopify_order_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location_id TEXT NOT NULL,
+        shopify_order_id TEXT NOT NULL,
+        shopify_transaction_id TEXT NOT NULL,
+        shopify_parent_id TEXT,
+        shopify_order_name TEXT,
+        kind TEXT,
+        status TEXT,
+        gateway TEXT,
+        payment_date TEXT,
+        currency TEXT,
+        amount REAL,
+        raw_payload_json TEXT,
+        spiris_invoice_id TEXT,
+        spiris_customer_id TEXT,
+        payout_booking_status TEXT NOT NULL DEFAULT 'pending',
+        payout_booking_error_text TEXT,
+        bank_voucher_number TEXT,
+        bank_voucher_year TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(location_id, shopify_transaction_id)
+      )
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_shopify_order_transactions_location
+        ON shopify_order_transactions(location_id)
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_shopify_order_transactions_order
+        ON shopify_order_transactions(location_id, shopify_order_id)
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_shopify_order_transactions_booking_status
+        ON shopify_order_transactions(location_id, payout_booking_status)
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shopify_payouts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location_id TEXT NOT NULL,
+        shopify_payout_id TEXT NOT NULL,
+        status TEXT,
+        payout_date TEXT,
+        currency TEXT,
+        amount REAL,
+        charges_gross REAL,
+        charges_fee REAL,
+        refunds_gross REAL,
+        accounting_status TEXT DEFAULT 'pending',
+        last_error_text TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(location_id, shopify_payout_id)
+      )
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_shopify_payouts_location
+        ON shopify_payouts(location_id)
+    `);
+
+    db.run(`
+      CREATE INDEX IF NOT EXISTS idx_shopify_payouts_status
+        ON shopify_payouts(accounting_status)
+    `);
 
     console.log("Database migrations completed");
 
