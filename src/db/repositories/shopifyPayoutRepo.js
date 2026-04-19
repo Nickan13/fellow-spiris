@@ -63,12 +63,21 @@ async function markAccountingFailed(locationId, shopifyPayoutId, errorText) {
   `, [errorText, locationId, String(shopifyPayoutId)]);
 }
 
-async function getPendingPayouts(locationId) {
-  return await all(`
+async function getPendingPayouts(locationId, fromDate = null) {
+  let sql = `
     SELECT * FROM shopify_payouts
     WHERE location_id = ? AND accounting_status = 'pending' AND status = 'paid'
-    ORDER BY payout_date ASC
-  `, [locationId]);
+  `;
+  const params = [locationId];
+
+  if (fromDate) {
+    sql += ` AND payout_date >= ?`;
+    params.push(fromDate);
+  }
+
+  sql += ` ORDER BY payout_date ASC`;
+
+  return await all(sql, params);
 }
 
 module.exports = {

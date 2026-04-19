@@ -47,7 +47,8 @@ async function processPayoutAccounting() {
   const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
   const accessToken = process.env.SHOPIFY_PAYOUTS_TOKEN;
 
-  const pendingPayouts = await shopifyPayoutRepo.getPendingPayouts(LOCATION_ID);
+  const fromDate = process.env.SHOPIFY_PAYOUT_ACCOUNTING_FROM_DATE || null;
+  const pendingPayouts = await shopifyPayoutRepo.getPendingPayouts(LOCATION_ID, fromDate);
 
   if (pendingPayouts.length === 0) {
     return;
