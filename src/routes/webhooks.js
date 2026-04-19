@@ -515,6 +515,10 @@ router.post("/shopify/orders/create", async (req, res) => {
         return res.sendStatus(200);
       }
 
+      if (process.env.SHOPIFY_ORDER_INVOICE_ENABLED !== "true") {
+        console.log("[SHOPIFY ORDER] invoice disabled via SHOPIFY_ORDER_INVOICE_ENABLED, skipping Spiris job");
+        } else {
+
     const shopifyOrderJobRepo = require("../db/repositories/shopifyOrderJobRepo");
 
     const existing = await shopifyOrderRepo.getOrderMapping(
@@ -533,7 +537,7 @@ router.post("/shopify/orders/create", async (req, res) => {
       });
 
       console.log("[SHOPIFY ORDER] Spiris job created");
-    }
+    }}
 
     if (!email) {
       console.log("[SHOPIFY ORDER] no email on order, skipping HL metrics sync");
@@ -717,6 +721,139 @@ router.post("/shopify/checkouts/update", async (req, res) => {
   } catch (err) {
     console.error("[shopify checkout webhook] error:", err);
     return res.status(500).send("error");
+  }
+});
+
+router.post("/shopify/refunds/create", async (req, res) => {
+  console.log("[SHOPIFY REFUND WEBHOOK HIT]");
+
+  try {
+    const isValid = verifyShopifyWebhook(req);
+
+    if (!isValid) {
+      console.error("[shopify refund webhook] invalid HMAC");
+      return res.status(401).send("invalid signature");
+    }
+
+    const payload = req.body || {};
+    const locationId = "FZK53zttFssaKFsCr9jl";
+    const shopifyOrderId = String(payload.order_id || "");
+    const shopifyRefundId = String(payload.id || "");
+
+    console.log("[SHOPIFY REFUND] order_id:", shopifyOrderId, "refund_id:", shopifyRefundId);
+
+    const mapping = await shopifyOrderRepo.getOrderMapping(locationId, shopifyOrderId);
+
+    if (!mapping) {
+      console.log("[SHOPIFY REFUND] no order mapping found, skipping:", shopifyOrderId);
+      return res.sendStatus(200);
+    }
+
+    if (!mapping.spiris_invoice_id) {
+      console.log("[SHOPIFY REFUND] no spiris_invoice_id on mapping, skipping:", shopifyOrderId);
+      return res.sendStatus(200);
+    }
+
+    const refundLineItems = Array.isArray(payload.refund_line_items)
+      ? payload.refund_line_items
+      : [];
+
+    const shippingAdjustments = Array.isArray(payload.order_adjustments)
+      ? payload.order_adjustments.filter((a) => a.kind === "shipping_refund")
+      : [];
+
+    const creditRows = [];
+
+    for (const rli of refundLineItems) {
+      const li = rli.line_item || {};
+      const sku = String(li.sku || "").trim();
+      const quantity = Number(rli.quantity || 0);
+      const subtotal = Number(rli.subtotal || 0);
+      const totalTax = Number(rli.total_tax || 0);
+      const totalInclVat = subtotal + totalTax;
+
+      if (!sku || quantity <= 0) {
+        console.log("[SHOPIFY REFUND] skipping line item without sku or qty:", rli);
+        continue;
+      }
+
+      const unitPriceInclVat = quantity > 0 ? Number((totalInclVat / quantity).toFixed(2)) : 0;
+
+      const { getArticleByNumber } = require("../services/articleStore");
+      const article = await getArticleByNumber(locationId, sku);
+
+      if (!article) {
+        console.warn("[SHOPIFY REFUND] no Spiris article for SKU:", sku);
+        continue;
+      }
+
+      creditRows.push({
+        ArticleId: article.spirisArticleId,
+        Text: String(li.name || li.title || sku),
+        Quantity: quantity,
+        UnitPrice: unitPriceInclVat
+      });
+    }
+
+    for (const adj of shippingAdjustments) {
+      const amount = Math.abs(Number(adj.amount || 0));
+      const taxAmount = Math.abs(Number(adj.tax_amount || 0));
+      const totalInclVat = amount + taxAmount;
+
+      if (totalInclVat > 0) {
+        const freightSku = "frakt";
+        const { getArticleByNumber } = require("../services/articleStore");
+        const freightArticle = await getArticleByNumber(locationId, freightSku);
+
+        if (freightArticle) {
+          creditRows.push({
+            ArticleId: freightArticle.spirisArticleId,
+            Text: "Återbetalning frakt",
+            Quantity: 1,
+            UnitPrice: totalInclVat
+          });
+        } else {
+          console.warn("[SHOPIFY REFUND] no Spiris article for freight SKU:", freightSku);
+        }
+      }
+    }
+
+    if (creditRows.length === 0) {
+      console.log("[SHOPIFY REFUND] no credit rows to create for order:", shopifyOrderId);
+      return res.sendStatus(200);
+    }
+
+    const tokenService = require("../services/tokenService");
+    const spirisService = require("../services/spirisService");
+    const accessToken = await tokenService.getAccessTokenForLocation(locationId);
+
+    const refundDate = String(payload.processed_at || payload.created_at || "").split("T")[0]
+      || new Date().toISOString().split("T")[0];
+
+    const creditPayload = {
+      InvoiceDate: refundDate,
+      IncludesVat: true,
+      Rows: creditRows
+    };
+
+    console.log("[SHOPIFY REFUND] creating credit invoice in Spiris:", {
+      spirisInvoiceId: mapping.spiris_invoice_id,
+      refundDate,
+      rows: creditRows.length
+    });
+
+    const creditInvoice = await spirisService.createCreditInvoice(
+      accessToken,
+      mapping.spiris_invoice_id,
+      creditPayload
+    );
+
+    console.log("[SHOPIFY REFUND] credit invoice created:", creditInvoice?.Id);
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error("[shopify refund webhook] error:", err.response?.data || err.message);
+    return res.sendStatus(500);
   }
 });
 
