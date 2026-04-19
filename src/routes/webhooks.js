@@ -12,6 +12,7 @@ const shopifyCustomerMetricsService = require("../services/shopifyCustomerMetric
 const { upsertCustomerDataToHL } = require("../services/shopifyCustomerProfileService");
 const { updateAbandonedCheckoutInHL } = require("../services/shopifyAbandonedCheckoutService");
 const { upsertShopifyCustomerToFellow } = require("../services/shopifyCustomerProfileService");
+const shopifyRefundRepo = require("../db/repositories/shopifyRefundRepo");
 
 const env = require("../config/env");
 const invoiceOrchestrator = require("../services/invoiceOrchestrator");
@@ -742,6 +743,13 @@ router.post("/shopify/refunds/create", async (req, res) => {
 
     console.log("[SHOPIFY REFUND] order_id:", shopifyOrderId, "refund_id:", shopifyRefundId);
 
+    // Idempotens-skydd
+    const existingRefund = await shopifyRefundRepo.getRefundMapping(locationId, shopifyRefundId);
+    if (existingRefund) {
+      console.log("[SHOPIFY REFUND] already processed, skipping:", shopifyRefundId);
+      return res.sendStatus(200);
+    }
+
     const mapping = await shopifyOrderRepo.getOrderMapping(locationId, shopifyOrderId);
 
     if (!mapping) {
@@ -849,6 +857,13 @@ router.post("/shopify/refunds/create", async (req, res) => {
     );
 
     console.log("[SHOPIFY REFUND] credit invoice created:", creditInvoice?.Id);
+
+    await shopifyRefundRepo.createRefundMapping({
+      locationId,
+      shopifyOrderId,
+      shopifyRefundId,
+      spirisCreditInvoiceId: creditInvoice?.Id || null
+    });
 
     return res.sendStatus(200);
   } catch (err) {

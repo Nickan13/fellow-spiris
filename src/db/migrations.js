@@ -279,6 +279,18 @@ db.run(`
         ON shopify_payouts(accounting_status)
     `);
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shopify_refund_mappings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location_id TEXT NOT NULL,
+        shopify_order_id TEXT NOT NULL,
+        shopify_refund_id TEXT NOT NULL,
+        spiris_credit_invoice_id TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(location_id, shopify_refund_id)
+      )
+    `);
+
     console.log("Database migrations completed");
 
   });
